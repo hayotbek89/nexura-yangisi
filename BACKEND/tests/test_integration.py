@@ -105,7 +105,7 @@ def test_scan_plan_execution_flow(tmp_path):
 
     runner = ScanRunner()
     with (
-        patch("shutil.which", return_value="/usr/bin/nmap"),
+        patch("os.path.isfile", return_value=True),
         patch.object(runner, "_execute") as mock_exec,
         patch.object(runner, "_parse") as mock_parse,
     ):

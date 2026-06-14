@@ -53,8 +53,8 @@ class AIEngine:
     def is_ready(self) -> bool:
         return self._ready
 
-    def ask(self, system: str, prompt: str, temperature: float = None, max_tokens: int = None) -> str:
-        return self._call_llm(system, prompt, config.TIMEOUT, temperature, max_tokens)
+    def ask(self, system: str, prompt: str, temperature: float = None, max_tokens: int = None, timeout: float = 60.0) -> str:
+        return self._call_llm(system, prompt, timeout, temperature, max_tokens)
 
     def ask_with_timeout(self, system: str, prompt: str, timeout: float = 60.0) -> str:
         return self._call_llm(system, prompt, timeout, config.LLAMA_TEMP, config.LLAMA_MAX_TOKENS)
@@ -100,9 +100,9 @@ class AIEngine:
         raw = self.ask(system, prompt)
         return self._extract_json(raw)
 
-    async def ask_async(self, system: str, prompt: str, temperature: float = None, max_tokens: int = None) -> str:
+    async def ask_async(self, system: str, prompt: str, temperature: float = None, max_tokens: int = None, timeout: float = 60.0) -> str:
         return await asyncio.to_thread(
-            self.ask, system, prompt, temperature, max_tokens
+            self.ask, system, prompt, temperature, max_tokens, timeout
         )
 
     async def ask_structured_async(self, system: str, prompt: str) -> dict:

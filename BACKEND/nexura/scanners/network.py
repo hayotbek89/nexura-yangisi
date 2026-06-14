@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 import httpx
 
 from nexura import config
-from nexura.config import SUBPROCESS_ENV
+from nexura.config import get_env
 from nexura.models.schemas import PortInfo, ScanResult
 from nexura.models.services import DEFAULT_PORTS, WELL_KNOWN_SERVICES
 
@@ -119,7 +119,7 @@ class NetworkScanner:
                 r = subprocess.run(
                     [whatweb_path, "--log-json=-", url],
                     capture_output=True, text=True, timeout=30,
-                    env=SUBPROCESS_ENV,
+                    env=get_env(),
                 )
                 if r.stdout:
                     lines = r.stdout.strip().splitlines()

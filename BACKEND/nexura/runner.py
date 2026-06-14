@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from nexura import config
-from nexura.config import SUBPROCESS_ENV, TOOL_PATHS
+from nexura.config import TOOL_PATHS, get_env
 from nexura.cve_lookup import CVELookup
 from nexura.models.schemas import (
     ParserResult,
@@ -88,8 +88,8 @@ class ScanRunner:
                         ports_list.append(int(part))
             return scanner.quick_scan(target, ports_list or None)
 
-        binary = shutil.which(tool.value) or TOOL_PATHS.get(tool.value)
-        if not binary:
+        binary = TOOL_PATHS.get(tool.value, tool.value)
+        if not os.path.isfile(binary):
             result.error = f"{tool.value} topilmadi. O'rnatish kerak."
             result.end_time = datetime.now()
             return result
@@ -142,9 +142,9 @@ class ScanRunner:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(self._executor, self.run, command, target)
 
-    def _execute(self, cmd: list[str], env: dict | None = None) -> tuple[str, int]:
+    def _execute(self, cmd: list[str]) -> tuple[str, int]:
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=config.TIMEOUT, env=env or SUBPROCESS_ENV)
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=config.TIMEOUT, env=get_env())
             return (r.stdout or r.stderr, r.returncode)
         except subprocess.TimeoutExpired:
             return (f"TIMEOUT: Skanerlash {config.TIMEOUT} soniyadan oshdi.", -1)

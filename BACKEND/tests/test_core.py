@@ -19,11 +19,11 @@ class TestScanRunner:
             assert "topilmadi" in result.error
 
 
-    @patch("nexura.runner.shutil.which")
+    @patch("os.path.isfile")
     @patch("nexura.runner.ScanRunner._execute")
-    def test_run_success(self, mock_exec, mock_which):
+    def test_run_success(self, mock_exec, mock_isfile):
         from nexura.runner import ScanRunner
-        mock_which.return_value = "/usr/bin/nmap"
+        mock_isfile.return_value = True
         mock_exec.return_value = ("Nmap done: 1 IP address", 0)
         runner = ScanRunner()
         cmd = ToolCommand(tool=ToolType.NMAP, args=["example.com"], description="")
@@ -32,11 +32,11 @@ class TestScanRunner:
         assert result.tool == "nmap"
 
 
-    @patch("nexura.runner.shutil.which")
+    @patch("os.path.isfile")
     @patch("nexura.runner.ScanRunner._execute")
-    def test_run_failure_exit_code(self, mock_exec, mock_which):
+    def test_run_failure_exit_code(self, mock_exec, mock_isfile):
         from nexura.runner import ScanRunner
-        mock_which.return_value = "/usr/bin/nmap"
+        mock_isfile.return_value = True
         mock_exec.return_value = ("Error: invalid target", 1)
         runner = ScanRunner()
         cmd = ToolCommand(tool=ToolType.NMAP, args=["bad-target"], description="")

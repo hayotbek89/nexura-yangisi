@@ -38,14 +38,22 @@ IS_PRODUCTION = os.getenv("NEXURA_PRODUCTION", "").lower() in ("1", "true", "yes
 
 import shutil
 
-SUBPROCESS_ENV = {**os.environ, "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"}
-
-TOOL_PATHS: dict[str, str] = {
-    "nmap": "/usr/bin/nmap",
-    "nuclei": "/usr/local/bin/nuclei",
-    "nikto": "/usr/bin/nikto",
-    "sqlmap": "/usr/bin/sqlmap",
-    "gobuster": "/usr/bin/gobuster",
-    "amass": "/snap/bin/amass",
-    "whatweb": "/usr/bin/whatweb",
+TOOL_PATHS = {
+    "nmap":      "/usr/bin/nmap",
+    "nuclei":    "/usr/local/bin/nuclei",
+    "nikto":     "/usr/bin/nikto",
+    "sqlmap":    "/usr/bin/sqlmap",
+    "gobuster":  "/usr/bin/gobuster",
+    "amass":     "/snap/bin/amass",
+    "whatweb":   "/usr/bin/whatweb",
 }
+
+def is_tool_available(tool_name: str) -> bool:
+    if tool_name in TOOL_PATHS:
+        return os.path.isfile(TOOL_PATHS[tool_name])
+    return shutil.which(tool_name) is not None
+
+def get_env():
+    env = os.environ.copy()
+    env["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
+    return env

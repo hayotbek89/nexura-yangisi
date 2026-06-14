@@ -410,20 +410,45 @@ def _get_history_from_files() -> dict:
     return {"reports": reports}
 
 
+def detect_intent(message: str) -> str:
+    message_lower = message.lower()
+
+    scan_keywords = [
+        "tekshir", "skaner", "scan", "check", "audit",
+        "zaiflik", "vulnerability", "port", "nmap",
+        "nuclei", "nikto", "sqlmap", "gobuster", "amass",
+        "whatweb", "subdomain", "inject", "xss", "exploit"
+    ]
+
+    domain_pattern = r'([a-zA-Z0-9-]+\.[a-zA-Z]{2,})'
+    has_domain = bool(re.search(domain_pattern, message))
+
+    for keyword in scan_keywords:
+        if keyword in message_lower:
+            return "scan"
+
+    if has_domain and any(word in message_lower for word in
+       ["tekshir", "scan", "zaiflik", "port", "check"]):
+        return "scan"
+
+    cyber_keywords = [
+        "nima", "qanday", "tushuntir", "what", "how",
+        "explain", "sql injection", "xss", "csrf", "owasp",
+        "hacker", "penetration", "pentest", "firewall",
+        "encrypt", "decrypt", "malware", "phishing"
+    ]
+    for keyword in cyber_keywords:
+        if keyword in message_lower:
+            return "cyber_question"
+
+    return "chat"
+
+
 def _check_tools() -> dict:
     tools = ["nmap", "nuclei", "nikto", "sqlmap", "gobuster", "amass", "whatweb"]
     result = {}
     for t in tools:
-        path = shutil.which(t)
-        if not path and sys.platform == "win32":
-            extra = {
-                "nmap": r"C:\Program Files\nmap\nmap.exe",
-                "nuclei": os.path.expanduser(r"~\nuclei\nuclei.exe"),
-                "whatweb": os.path.expanduser(r"~\whatweb\whatweb.exe"),
-            }
-            if t in extra and os.path.exists(extra[t]):
-                path = extra[t]
-        result[t] = {"available": path is not None}
+        result[t] = {"available": config.is_tool_available(t)}
     return result
 
 
@@ -447,116 +472,110 @@ async def list_reports(request: Request, _=Depends(_verify_token)):
 async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_token)):
     state = request.app.state
     message = req.message.strip()
-    
-    if not state.engine.is_ready:
-        return {
-            "response": "AI hozir offline. Terminal orqali ishlashingiz mumkin.",
-            "scan_data": None
+    intent = detect_intent(message)
+
+    if intent == "chat":
+        responses = {
+            "salom": "Salom! Men NEXURA AI yordamchisiman. Sayt zaifliklarini tekshirish, kiberxavfsizlik savollari yoki skanerlash buyruqlari bo'yicha yordam bera olaman. Qanday yordam kerak?",
+            "xayr": "Xayr! Yana zaiflik tekshirishga kelganingizda xizmatdaman.",
+            "rahmat": "Arzimaydi! Yana yordam kerak bo'lsa murojaat qiling.",
+            "yaxshimisan": "Yaxshi, rahmat! Sizga qanday yordam bera olaman?",
         }
-    
-    # Check if the user is asking for a security scan
-    scan_keywords = ("scan", "skaner", "tekshir", "port", "nmap", "nuclei", "nikto", "sqlmap", "gobuster", "amass", "whatweb", "cve", "zaiflik")
-    is_scan_request = any(kw in message.lower() for kw in scan_keywords)
-    
-    if is_scan_request:
-        selector = _get_selector(request)
-        if not selector:
-            engine = state.engine
-            selector = ToolSelector(engine)
-            state.selector = selector
+        msg_lower = message.lower()
+        for key, response in responses.items():
+            if key in msg_lower:
+                return {"response": response, "intent": "chat", "scan_data": None}
+        return {"response": "Salom! Men NEXURA AI yordamchisiman. Masalan: 'example.com saytini tekshir' yoki 'SQL injection nima?' deb so'rang.", "intent": "chat", "scan_data": None}
 
-        plan = await selector.create_plan_async(message, req.target)
-        report = state.reporter.create_report(plan.target, plan.intent)
-
-        if req.agentic and selector.engine.is_ready:
-            results = await selector.run_agentic_scan_async(message, plan.target, state.runner)
-            report.results = results
-        else:
-            for tc in plan.tools:
-                result = await state.runner.run_async(tc, plan.target)
-                report.results.append(result)
-
-        report.end_time = datetime.now()
-        report.status = "completed"
-
+    if intent == "cyber_question":
+        if not state.engine.is_ready:
+            return {"response": "AI hozir offline. Terminal orqali ishlashingiz mumkin: nmap -F example.com", "intent": "chat", "scan_data": None}
+        system = ("Sen NEXURA kiberxavfsizlik AI yordamchisisisan. "
+                  "Foydalanuvchi savollariga o'zbek tilida aniq, "
+                  "qisqa va tushunarli javob ber. "
+                  "Skanerlash kerak bo'lsa ayt.")
         try:
-            tech_url = plan.target if "://" in plan.target else f"https://{plan.target}"
-            report.technologies = state.scanner.detect_technologies(tech_url)
+            ai_response = await state.engine.ask_async(system, message, timeout=60)
+            return {"response": ai_response, "intent": "cyber_question", "scan_data": None}
         except Exception as e:
-            logger.warning("Technology detection failed for %s: %s", plan.target, e, exc_info=True)
+            err = str(e)
+            if "timeout" in err.lower() or "60" in err:
+                return {"response": "AI hozir band, terminal orqali ishlashingiz mumkin: nmap -F example.com", "intent": "chat", "scan_data": None}
+            return {"response": f"AI modeldan javob olishda xatolik yuz berdi: {e}", "intent": "chat", "scan_data": None}
 
-        html_path = state.reporter.save(report, fmt="both")
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, state.history_db.save_session, report, report.technologies)
+    # intent == "scan"
+    selector = _get_selector(request)
+    if not selector:
+        if not state.engine.is_ready:
+            return {"response": "AI yordamchisi yoqilmagan. Terminal orqali buyruq bering: nmap -F <target>", "intent": "chat", "scan_data": None}
+        selector = ToolSelector(state.engine)
+        state.selector = selector
 
-        if report.technologies and report.technologies.get("cms"):
-            try:
-                cve_results = await state.cve_lookup.lookup_by_service(report.technologies["cms"], "")
-                if not report.results:
-                    report.results.append(
-                        ScanResult(tool="cve", target=plan.target, start_time=datetime.now(), success=True)
-                    )
-                for cv in cve_results:
-                    if not any(v.cve == cv.cve_id for r in report.results for v in r.vulnerabilities):
-                        report.results[0].vulnerabilities.append(Vulnerability(
-                            name=f"CVE: {cv.cve_id} — {cv.description[:100]}",
-                            severity=cv.severity,
-                            cve=cv.cve_id,
-                            cvss=cv.cvss_score,
-                            url=cv.url,
-                        ))
-            except Exception as e:
-                logger.warning("CVE enrichment failed for %s: %s", report.technologies["cms"], e, exc_info=True)
+    plan = await selector.create_plan_async(message, req.target)
+    report = state.reporter.create_report(plan.target, plan.intent)
 
-        relative_report_html = f"/reports/{Path(html_path).name}" if html_path else None
-        
-        # Build AI response summary
-        ai_response = f"Men **{plan.target}** bo'yicha skanerlash rejasini tuzdim va quyidagi vositalarni ishga tushirdim:\n"
-        for tc in plan.tools:
-            ai_response += f"- **{tc.tool.value.upper()}**: {tc.description}\n"
-        
-        ai_response += f"\n**Tahlil natijasi (Reasoning):** {plan.reasoning}\n\n"
-        
-        total_vulns = sum(len(r.vulnerabilities) for r in report.results)
-        total_ports = sum(len(r.ports) for r in report.results)
-        ai_response += f"Skanerlash muvaffaqiyatli yakunlandi. Jami **{total_ports} ta ochiq port** va **{total_vulns} ta zaiflik** aniqlandi."
-        
-        return {
-            "response": ai_response,
-            "scan_data": {
-                "id": report.id,
-                "target": report.target,
-                "intent": plan.intent,
-                "results": [r.model_dump(mode="json", exclude_none=True) for r in report.results],
-                "report_html": relative_report_html,
-                "technologies": report.technologies,
-            }
-        }
+    if req.agentic and selector.engine.is_ready:
+        results = await selector.run_agentic_scan_async(message, plan.target, state.runner)
+        report.results = results
     else:
-        engine = state.engine
-        if not engine.is_ready:
-            return {
-                "response": "Assalomu alaykum! Hozirda AI yordamchisi vaqtincha mavjud emas. Terminal orqali to'g'ridan-to'g'ri skanerlash buyruqlarini ishlatishingiz mumkin. Masalan: nmap -F example.com",
-                "scan_data": None
-            }
-        
-        system_prompt = (
-            "Siz NEXURA — AI quvvatli zaiflik skaneri yordamchisisiz. "
-            "Kiberxavfsizlik, skanerlash vositalari (nmap, nuclei, nikto va h.k.) haqidagi savollarga javob bering. "
-            "Javoblaringiz qisqa, tushunarli va professional kiberxavfsizlik mutaxassisi uslubida bo'lsin. Markdown formatidan foydalaning."
-        )
-        
+        for tc in plan.tools:
+            result = await state.runner.run_async(tc, plan.target)
+            report.results.append(result)
+
+    report.end_time = datetime.now()
+    report.status = "completed"
+
+    try:
+        tech_url = plan.target if "://" in plan.target else f"https://{plan.target}"
+        report.technologies = state.scanner.detect_technologies(tech_url)
+    except Exception as e:
+        logger.warning("Technology detection failed for %s: %s", plan.target, e, exc_info=True)
+
+    html_path = state.reporter.save(report, fmt="both")
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, state.history_db.save_session, report, report.technologies)
+
+    if report.technologies and report.technologies.get("cms"):
         try:
-            ai_response = await engine.ask_async(system_prompt, message)
-            return {
-                "response": ai_response,
-                "scan_data": None
-            }
+            cve_results = await state.cve_lookup.lookup_by_service(report.technologies["cms"], "")
+            if not report.results:
+                report.results.append(
+                    ScanResult(tool="cve", target=plan.target, start_time=datetime.now(), success=True)
+                )
+            for cv in cve_results:
+                if not any(v.cve == cv.cve_id for r in report.results for v in r.vulnerabilities):
+                    report.results[0].vulnerabilities.append(Vulnerability(
+                        name=f"CVE: {cv.cve_id} — {cv.description[:100]}",
+                        severity=cv.severity,
+                        cve=cv.cve_id,
+                        cvss=cv.cvss_score,
+                        url=cv.url,
+                    ))
         except Exception as e:
-            return {
-                "response": f"AI modeldan javob olishda xatolik yuz berdi: {e}",
-                "scan_data": None
-            }
+            logger.warning("CVE enrichment failed for %s: %s", report.technologies["cms"], e, exc_info=True)
+
+    relative_report_html = f"/reports/{Path(html_path).name}" if html_path else None
+
+    ai_response = f"Men **{plan.target}** bo'yicha skanerlash rejasini tuzdim va quyidagi vositalarni ishga tushirdim:\n"
+    for tc in plan.tools:
+        ai_response += f"- **{tc.tool.value.upper()}**: {tc.description}\n"
+    ai_response += f"\n**Tahlil natijasi (Reasoning):** {plan.reasoning}\n\n"
+    total_vulns = sum(len(r.vulnerabilities) for r in report.results)
+    total_ports = sum(len(r.ports) for r in report.results)
+    ai_response += f"Skanerlash muvaffaqiyatli yakunlandi. Jami **{total_ports} ta ochiq port** va **{total_vulns} ta zaiflik** aniqlandi."
+
+    return {
+        "response": ai_response,
+        "intent": "scan",
+        "scan_data": {
+            "id": report.id,
+            "target": report.target,
+            "intent": plan.intent,
+            "results": [r.model_dump(mode="json", exclude_none=True) for r in report.results],
+            "report_html": relative_report_html,
+            "technologies": report.technologies,
+        }
+    }
 
 
 ALLOWED_TERMINAL_COMMANDS = frozenset({
@@ -588,7 +607,7 @@ async def run_terminal(req: TerminalRequest, request: Request, _=Depends(_verify
             "code": 1
         }
 
-    binary_path = shutil.which(binary)
+    binary_path = config.TOOL_PATHS.get(binary_clean) or shutil.which(binary)
     if not binary_path and sys.platform == "win32":
         extra = {
             "nmap": r"C:\Program Files\nmap\nmap.exe",
@@ -607,21 +626,24 @@ async def run_terminal(req: TerminalRequest, request: Request, _=Depends(_verify
                 binary_clean, *cmd_args[1:],
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=str(config.BASE_DIR)
+                cwd=str(config.BASE_DIR),
+                env=config.get_env(),
             )
         elif binary_clean == "dir" or (binary_clean == "ls" and sys.platform == "win32"):
             proc = await asyncio.create_subprocess_exec(
                 "cmd", "/c", "dir", *cmd_args[1:],
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=str(config.BASE_DIR)
+                cwd=str(config.BASE_DIR),
+                env=config.get_env(),
             )
         else:
             proc = await asyncio.create_subprocess_exec(
                 binary_path, *cmd_args[1:],
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=str(config.BASE_DIR)
+                cwd=str(config.BASE_DIR),
+                env=config.get_env(),
             )
 
         try:

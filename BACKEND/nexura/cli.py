@@ -1,4 +1,3 @@
-import shutil
 from datetime import datetime
 
 import click
@@ -8,7 +7,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 
 from nexura.ai_engine import get_engine
-from nexura.config import MODELS_DIR, WEB_HOST, WEB_PORT, ensure_dirs
+from nexura.config import MODELS_DIR, TOOL_PATHS, WEB_HOST, WEB_PORT, ensure_dirs, is_tool_available
 from nexura.models.schemas import ToolType
 from nexura.report.generator import ReportGenerator
 from nexura.runner import ScanRunner
@@ -149,8 +148,9 @@ def list_tools():
             status = "[green]OK[/]"
             note = "[dim](built-in)[/]"
         else:
-            path = shutil.which(tool.value)
-            if path:
+            available = is_tool_available(tool.value)
+            if available:
+                path = TOOL_PATHS.get(tool.value, tool.value)
                 status = "[green]OK[/]"
                 note = f"[dim]({path})[/]"
             else:

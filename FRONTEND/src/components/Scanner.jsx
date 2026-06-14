@@ -121,8 +121,14 @@ export default function Scanner() {
       return
     }
 
-    setChatLoading(true)
-    setScanning(true)
+    // Simple greetings — skip loading
+    const simpleWords = ['salom', 'xayr', 'rahmat', 'yaxshimisan', 'nima gap', 'nma gap']
+    const isSimple = simpleWords.some(w => userMsg.toLowerCase().includes(w))
+
+    if (!isSimple) {
+      setChatLoading(true)
+      setScanning(true)
+    }
 
     try {
       const res = await fetch('/api/chat', {

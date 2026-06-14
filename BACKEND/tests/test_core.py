@@ -13,9 +13,10 @@ class TestScanRunner:
         mock_which.return_value = None
         runner = ScanRunner()
         cmd = ToolCommand(tool=ToolType.NMAP, args=["example.com"], description="")
-        result = runner.run(cmd, "example.com")
-        assert not result.success
-        assert "topilmadi" in result.error
+        with patch("nexura.runner.TOOL_PATHS", {}):
+            result = runner.run(cmd, "example.com")
+            assert not result.success
+            assert "topilmadi" in result.error
 
 
     @patch("nexura.runner.shutil.which")

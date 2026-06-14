@@ -136,7 +136,7 @@ def test_runner_execute_binary_not_found(tmp_path):
     """Runner handles missing binary gracefully."""
     runner = ScanRunner()
     tc = ToolCommand(tool=ToolType.NMAP, args=["test.local"], description="")
-    with patch("shutil.which", return_value=None):
+    with patch("shutil.which", return_value=None), patch("nexura.runner.TOOL_PATHS", {}):
         result = runner.run(tc, "test.local")
     assert result.success is False
     assert result.error is not None

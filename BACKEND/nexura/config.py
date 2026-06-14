@@ -35,3 +35,17 @@ SSL_VERIFY = os.getenv("NEXURA_SSL_VERIFY", "1") == "1"
 SOCKET_TIMEOUT = float(os.getenv("NEXURA_SOCKET_TIMEOUT", "2.0"))
 
 IS_PRODUCTION = os.getenv("NEXURA_PRODUCTION", "").lower() in ("1", "true", "yes")
+
+import shutil
+
+SUBPROCESS_ENV = {**os.environ, "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"}
+
+TOOL_PATHS: dict[str, str] = {
+    "nmap": "/usr/bin/nmap",
+    "nuclei": "/usr/local/bin/nuclei",
+    "nikto": "/usr/bin/nikto",
+    "sqlmap": "/usr/bin/sqlmap",
+    "gobuster": "/usr/bin/gobuster",
+    "amass": "/snap/bin/amass",
+    "whatweb": "/usr/bin/whatweb",
+}

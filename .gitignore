@@ -2,7 +2,6 @@ venv/
 __pycache__/
 *.pyc
 config.json
-*.log
 .env
 .env.production
 BACKEND/reports/
@@ -10,10 +9,13 @@ LOCAL_AI_MODELS/
 *.gguf
 FRONTEND/dist/
 .vite/
-*.db
 .idea/
 .ruff_cache/
 .pytest_cache/
 SCANNING_TOOLS/
 nexura_scanner.iml
+
+# Runtime
+*.log
+*.db
 

@@ -1,0 +1,41 @@
+services:
+  nexura:
+    build: .
+    container_name: nexura-scanner
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - reports:/app/reports
+      - models:/app/LOCAL_AI_MODELS
+    environment:
+      - NEXURA_WEB_HOST=0.0.0.0
+      - NEXURA_WEB_PORT=8080
+      - NEXURA_PRODUCTION=true
+      - NEXURA_TIMEOUT=600
+      - NEXURA_SOCKET_TIMEOUT=5.0
+      - NEXURA_API_KEY=${NEXURA_API_KEY:?NEXURA_API_KEY not set! Generate one: openssl rand -hex 32}
+      - NEXURA_CORS_ORIGINS=${NEXURA_CORS_ORIGINS:-*}
+    env_file:
+      - .env.production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  reports:
+  models:

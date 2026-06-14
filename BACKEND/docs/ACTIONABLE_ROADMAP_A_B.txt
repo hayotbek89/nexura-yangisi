@@ -1,0 +1,355 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║           NEXURA SCANNER — AKSIYADAGI ROADMAP & CHECKLISTS                ║
+║            A QISMI (DEPLOYMENT) & B QISMI (CODE) UCHUN                    ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════
+🔴 A QISMI: DEPLOYMENT & INFRASTRUCTURE ROADMAP
+═══════════════════════════════════════════════════════════════════════════
+
+PHASE 1: CRITICAL INFRASTRUCTURE (Week 1-2)
+═════════════════════════════════════════════════════════════════════════
+
+[ ] A.1 - EXTERNAL TOOLS SETUP
+    ├─ [ ] Install nmap latest version
+    ├─ [ ] Install nuclei
+    ├─ [ ] Install nikto
+    ├─ [ ] Install sqlmap
+    ├─ [ ] Install gobuster
+    ├─ [ ] Install amass
+    ├─ [ ] Install whatweb
+    ├─ [ ] Verify all tools in PATH
+    ├─ [ ] Create tool detection script (/api/status)
+    └─ [ ] Document versions & requirements
+
+[ ] A.4 - ENVIRONMENT VARIABLES & CONFIG
+    ├─ [ ] Create .env template
+    ├─ [ ] Generate secure API keys
+    ├─ [ ] Set NEXURA_MODEL path (production)
+    ├─ [ ] Configure threads (NEXURA_THREADS)
+    ├─ [ ] Configure GPU layers (NEXURA_GPU_LAYERS)
+    ├─ [ ] Set timeout values
+    ├─ [ ] Set database location
+    ├─ [ ] Implement config validation at startup
+    ├─ [ ] Create secrets management system (vault/1Password)
+    └─ [ ] Document all env vars
+
+[ ] A.4 EXTENDED - SECRETS MANAGEMENT
+    ├─ [ ] Implement .env loader (python-dotenv)
+    ├─ [ ] Add API key validation
+    ├─ [ ] Mask secrets in logging
+    ├─ [ ] Setup env-based configs (dev, staging, prod)
+    ├─ [ ] Implement key rotation policy
+    ├─ [ ] Create secrets audit log
+    └─ [ ] Document secret management procedure
+
+
+PHASE 2: DATABASE & PERSISTENCE (Week 2)
+═════════════════════════════════════════════════════════════════════════
+
+[ ] A.3 - DATABASE INITIALIZATION
+    ├─ [ ] Ensure SQLite DB auto-creates
+    ├─ [ ] Verify schema creation
+    ├─ [ ] Test concurrent access
+    ├─ [ ] Setup WAL mode optimization
+    ├─ [ ] Implement schema versioning
+    ├─ [ ] Create migration system
+    ├─ [ ] Test backup/restore process
+    ├─ [ ] Setup encryption at rest (if sensitive)
+    ├─ [ ] Create DB health check endpoint
+    └─ [ ] Document DB setup & recovery
+
+[ ] A.10 - DISK SPACE & CLEANUP
+    ├─ [ ] Create reports cleanup cronjob (30-day retention)
+    ├─ [ ] Implement disk space monitoring
+    ├─ [ ] Setup alerts (90% threshold warning, 95% critical)
+    ├─ [ ] Create archival system (tar.gz old reports)
+    ├─ [ ] Test cleanup without data loss
+    ├─ [ ] Create /api/disk-usage endpoint
+    ├─ [ ] Document retention policy
+    └─ [ ] Setup monitoring dashboard
+
+
+PHASE 3: SECURITY & SSL (Week 3-4)
+═════════════════════════════════════════════════════════════════════════
+
+[ ] A.6 - HTTPS & SSL CERTIFICATE
+    ├─ [ ] Setup Nginx reverse proxy
+    ├─ [ ] Configure Let's Encrypt (production)
+    ├─ [ ] Generate self-signed cert (staging/dev)
+    ├─ [ ] Enable HSTS headers
+    ├─ [ ] Configure TLS 1.3 minimum
+    ├─ [ ] Setup certificate auto-renewal (certbot)
+    ├─ [ ] Implement cert rotation alerts
+    ├─ [ ] Test HTTPS endpoint
+    ├─ [ ] Configure firewall rules
+    └─ [ ] Document SSL setup & troubleshooting
+
+[ ] A.9 - RATE LIMITING & DDOS PROTECTION
+    ├─ [ ] Setup Redis server
+    ├─ [ ] Implement per-IP rate limiting
+    ├─ [ ] Configure per-endpoint rate limits
+    ├─ [ ] Setup request queueing
+    ├─ [ ] Implement circuit breaker (external APIs)
+    ├─ [ ] Add rate limit headers to responses
+    ├─ [ ] Test under load
+    ├─ [ ] Create monitoring dashboard
+    ├─ [ ] Document rate limit policies
+    └─ [ ] Setup alerts for abuse
+
+
+PHASE 4: OPERATIONS & MONITORING (Week 4-5)
+═════════════════════════════════════════════════════════════════════════
+
+[ ] A.5 - LOGGING & MONITORING
+    ├─ [ ] Implement structured JSON logging
+    ├─ [ ] Setup log rotation (10MB, keep 5 files)
+    ├─ [ ] Configure log levels per environment
+    ├─ [ ] Setup centralized logging (ELK, Datadog, etc)
+    ├─ [ ] Implement error tracking (Sentry optional)
+    ├─ [ ] Create log analysis dashboards
+    ├─ [ ] Setup log alerts for errors
+    ├─ [ ] Create audit logging for sensitive operations
+    ├─ [ ] Document logging standards
+    └─ [ ] Test log queries & retention
+
+[ ] A.7 - SYSTEMD SERVICE & AUTO-RESTART
+    ├─ [ ] Create systemd service file
+    ├─ [ ] Test service start/stop/restart
+    ├─ [ ] Enable auto-start on boot
+    ├─ [ ] Implement system health check
+    ├─ [ ] Setup auto-restart on failure
+    ├─ [ ] Create watchdog script
+    ├─ [ ] Configure resource limits (memory, CPU)
+    ├─ [ ] Setup service monitoring
+    ├─ [ ] Document service management
+    └─ [ ] Test failover scenarios
+
+[ ] A.2 - GGUF MODEL MANAGEMENT
+    ├─ [ ] Download GGUF model to /data/models/
+    ├─ [ ] Verify model checksum
+    ├─ [ ] Test model loading
+    ├─ [ ] Implement model caching
+    ├─ [ ] Setup async model loading (non-blocking)
+    ├─ [ ] Create model management endpoint
+    ├─ [ ] Implement model selection UI
+    ├─ [ ] Document model directory structure
+    ├─ [ ] Setup model update notifications
+    └─ [ ] Test fallback mode (model missing)
+
+
+PHASE 5: TESTING & VALIDATION (Week 5)
+═════════════════════════════════════════════════════════════════════════
+
+[ ] OPERATIONAL TESTING
+    ├─ [ ] End-to-end deployment test
+    ├─ [ ] Tool availability verification
+    ├─ [ ] Database persistence test
+    ├─ [ ] Configuration validation
+    ├─ [ ] SSL/TLS connectivity test
+    ├─ [ ] Rate limiting test (load test)
+    ├─ [ ] Failover scenarios test
+    ├─ [ ] Backup/restore validation
+    ├─ [ ] Security scan (penetration testing)
+    └─ [ ] Performance benchmarking
+
+[ ] COMPLIANCE & DOCUMENTATION
+    ├─ [ ] Security audit checklist
+    ├─ [ ] Infrastructure documentation
+    ├─ [ ] Runbook creation
+    ├─ [ ] Troubleshooting guide
+    ├─ [ ] Disaster recovery plan
+    ├─ [ ] Capacity planning
+    ├─ [ ] Access control documentation
+    ├─ [ ] Incident response plan
+    └─ [ ] Compliance audit (if needed)
+
+
+═══════════════════════════════════════════════════════════════════════════
+🔵 B QISMI: CODE & TECHNOLOGY ROADMAP
+═══════════════════════════════════════════════════════════════════════════
+
+PHASE 1: CRITICAL BUG FIXES (Week 1-2)
+═════════════════════════════════════════════════════════════════════════
+
+[ ] B.4 - SECURITY CRITICAL FIXES
+    ├─ [ ] Implement input validation (port 1-65535, valid IP)
+    ├─ [ ] Add SSRF prevention (private range check)
+    ├─ [ ] Fix XXE vulnerability (defusedxml)
+    ├─ [ ] Sanitize subprocess arguments (shell injection prevention)
+    ├─ [ ] Add command escaping utility
+    ├─ [ ] Path traversal protection in terminal endpoint
+    ├─ [ ] SQL injection verification (ORM verified)
+    ├─ [ ] CORS security hardening (env-based)
+    ├─ [ ] Add security headers (CSP, X-Frame-Options)
+    ├─ [ ] Implement request validation schema
+    ├─ [ ] Write security unit tests
+    └─ [ ] Security code review
+
+[ ] B.2 - ERROR HANDLING IMPROVEMENTS
+    ├─ [ ] ✅ ai_engine.py response parsing — DONE
+    ├─ [ ] Fix nmap.py parser (line 31 .find("ports") None check)
+    ├─ [ ] Add exception handling to all parsers
+    ├─ [ ] Implement retry logic for external APIs
+    ├─ [ ] Add circuit breaker pattern
+    ├─ [ ] Improve CVE lookup error handling
+    ├─ [ ] Add timeout handling for subprocess
+    ├─ [ ] Implement graceful degradation
+    ├─ [ ] Create structured error responses
+    ├─ [ ] Add detailed error logging
+    ├─ [ ] Write error handling tests
+    └─ [ ] Error recovery procedures documentation
+
+[ ] B.1 - PYDANTIC VALIDATORS
+    ├─ [ ] ✅ Mutable defaults — DONE
+    ├─ [ ] Add port range validators (1-65535)
+    ├─ [ ] Add IP/hostname validators
+    ├─ [ ] Add URL validators
+    ├─ [ ] Add severity enum validation
+    ├─ [ ] Add custom error messages
+    ├─ [ ] Implement field-level validators
+    ├─ [ ] Add cross-field validators
+    ├─ [ ] Write validator unit tests
+    └─ [ ] API error response documentation
+
+
+PHASE 2: DATA INTEGRITY & PARSING (Week 2-3)
+═════════════════════════════════════════════════════════════════════════
+
+[ ] B.5 - PARSER ROBUSTNESS
+    ├─ [ ] Defensive nmap XML parsing
+    ├─ [ ] Handle missing XML elements gracefully
+    ├─ [ ] Add nuclei output parser versioning
+    ├─ [ ] Improve nikto output parsing
+    ├─ [ ] Improve sqlmap JSON parsing
+    ├─ [ ] Improve gobuster output parsing
+    ├─ [ ] Improve amass parsing
+    ├─ [ ] Add whatweb error handling
+    ├─ [ ] Create parser unit test fixtures
+    ├─ [ ] Add parser fallback chain
+    ├─ [ ] Write integration tests for parsers
+    └─ [ ] Parser documentation & examples
+
+
+PHASE 3: CODE QUALITY & TESTING (Week 3-4)
+═════════════════════════════════════════════════════════════════════════
+
+[ ] B.6 - TESTING & CODE COVERAGE
+    ├─ [ ] ✅ Basic unit tests (45/45) — DONE
+    ├─ [ ] Add pytest coverage tracking (pytest-cov)
+    ├─ [ ] Set coverage target (80%+)
+    ├─ [ ] Mock external tools (fake nmap output)
+    ├─ [ ] Mock external APIs (CVE lookup, whatweb)
+    ├─ [ ] Write integration tests
+    ├─ [ ] Setup CI/CD pipeline
+    ├─ [ ] Add load testing (locust)
+    ├─ [ ] Add security testing (bandit, safety)
+    ├─ [ ] Setup pre-commit hooks
+    ├─ [ ] Add type checking (mypy/pyright)
+    └─ [ ] Documentation of test procedures
+
+[ ] B.3 - PERFORMANCE OPTIMIZATION
+    ├─ [ ] Profile code execution (cProfile)
+    ├─ [ ] Optimize database queries (N+1 check)
+    ├─ [ ] Implement query result caching (Redis)
+    ├─ [ ] Async/await full coverage
+    ├─ [ ] Thread pool optimization
+    ├─ [ ] Connection pool tuning
+    ├─ [ ] Implement request caching
+    ├─ [ ] Optimize logging (async handlers)
+    ├─ [ ] Write performance benchmarks
+    ├─ [ ] Setup performance monitoring
+    └─ [ ] Performance baseline documentation
+
+
+PHASE 4: API & DESIGN IMPROVEMENTS (Week 4)
+═════════════════════════════════════════════════════════════════════════
+
+[ ] B.7 - API DESIGN & VERSIONING
+    ├─ [ ] Add API versioning (/api/v1, /api/v2)
+    ├─ [ ] Standardize response envelope
+    ├─ [ ] Add pagination (/api/history?limit=20&offset=0)
+    ├─ [ ] Add filtering capabilities
+    ├─ [ ] Add sorting capabilities
+    ├─ [ ] Generate OpenAPI/Swagger docs
+    ├─ [ ] Add deprecation headers
+    ├─ [ ] Use proper HTTP status codes
+    ├─ [ ] Write API documentation
+    └─ [ ] Test API backwards compatibility
+
+[ ] B.9 - INTERNATIONALIZATION CONSISTENCY
+    ├─ [ ] Decide: Uzbek-only or mixed
+    ├─ [ ] Extract hardcoded strings to constants
+    ├─ [ ] Create translation configuration
+    ├─ [ ] Update all user-facing messages
+    ├─ [ ] Standardize logging language
+    ├─ [ ] Update error messages
+    ├─ [ ] Document i18n strategy
+    └─ [ ] Test language consistency
+
+
+PHASE 5: DOCUMENTATION & DEPENDENCIES (Week 5)
+═════════════════════════════════════════════════════════════════════════
+
+[ ] B.8 - COMPREHENSIVE DOCUMENTATION
+    ├─ [ ] Update README.md (architecture, setup, usage)
+    ├─ [ ] Create API documentation (Swagger/OpenAPI)
+    ├─ [ ] Write developer guide (setup, debugging)
+    ├─ [ ] Create architecture documentation
+    ├─ [ ] Write contributing guidelines
+    ├─ [ ] Create troubleshooting guide
+    ├─ [ ] Add docstrings to all functions (Google style)
+    ├─ [ ] Create deployment guide
+    ├─ [ ] Write runbook
+    └─ [ ] Document all design decisions
+
+[ ] B.10 - DEPENDENCIES & SECURITY
+    ├─ [ ] Pin dependency versions (requirements.txt)
+    ├─ [ ] Setup security scanning (safety, dependabot)
+    ├─ [ ] Run dependency audit (pip-audit)
+    ├─ [ ] Check license compliance (FOSSA)
+    ├─ [ ] Update vulnerable packages
+    ├─ [ ] Document compatibility matrix
+    ├─ [ ] Setup automated dependency updates
+    ├─ [ ] Review and test all updates
+    └─ [ ] Create dependency documentation
+
+
+═══════════════════════════════════════════════════════════════════════════
+📋 QUICK PRIORITY RANKING
+═══════════════════════════════════════════════════════════════════════════
+
+MUST DO IMMEDIATELY (WEEK 1):
+  🔴 CRITICAL (A.1, A.4, B.4)  — Security & core functionality
+  🔴 CRITICAL (B.2)             — Error handling
+
+MUST DO BEFORE PRODUCTION (WEEK 2-3):
+  🟠 HIGH (A.3, A.6, B.1)        — Data integrity, SSL, validators
+  🟠 HIGH (B.5)                  — Parser robustness
+
+NICE TO HAVE BEFORE LAUNCH (WEEK 4-5):
+  🟡 MEDIUM (A.9, A.7, B.6)       — Operations, testing
+  🟡 MEDIUM (B.7, B.8)            — API design, docs
+
+═══════════════════════════════════════════════════════════════════════════
+
+✅ FINAL DEPLOYMENT CHECKLIST
+═══════════════════════════════════════════════════════════════════════════
+
+BEFORE GO-LIVE:
+
+[ ] All A QISMI items completed (infrastructure ready)
+[ ] All B QISMI CRITICAL items completed (code secure)
+[ ] 45/45 tests passing + new security tests passing
+[ ] Code reviewed by senior developer
+[ ] Security audit completed
+[ ] Performance testing completed (load/stress)
+[ ] Disaster recovery plan tested
+[ ] Documentation complete and verified
+[ ] Monitoring/alerting setup and tested
+[ ] Incident response team trained
+[ ] Legal/compliance review (if needed)
+[ ] Stakeholder approval
+
+═══════════════════════════════════════════════════════════════════════════
+

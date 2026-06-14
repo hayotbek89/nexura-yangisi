@@ -8,16 +8,8 @@ services:
     volumes:
       - reports:/app/reports
       - models:/app/LOCAL_AI_MODELS
-    environment:
-      - NEXURA_WEB_HOST=0.0.0.0
-      - NEXURA_WEB_PORT=8080
-      - NEXURA_PRODUCTION=true
-      - NEXURA_TIMEOUT=600
-      - NEXURA_SOCKET_TIMEOUT=5.0
-      - NEXURA_API_KEY=${NEXURA_API_KEY:?NEXURA_API_KEY not set! Generate one: openssl rand -hex 32}
-      - NEXURA_CORS_ORIGINS=${NEXURA_CORS_ORIGINS:-*}
     env_file:
-      - .env.production
+      - .env
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/api/status"]
       interval: 30s

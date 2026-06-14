@@ -144,10 +144,13 @@ class HistoryDB:
                         (report.id, p.port, p.state, p.service, p.version),
                     )
 
-            conn.commit()
+            conn.execute("COMMIT")
             logger.info("Session %s saved to database", report.id)
         except Exception as e:
-            conn.rollback()
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
             logger.error("Failed to save session %s: %s", report.id, e)
 
     def get_all_sessions(self, limit: int = 50) -> list[dict]:
@@ -256,16 +259,20 @@ class HistoryDB:
         try:
             conn.execute("BEGIN")
             cursor = conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
-            conn.commit()
+            conn.execute("COMMIT")
             return cursor.rowcount > 0
         except Exception as e:
-            conn.rollback()
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
             logger.error("Failed to delete session %s: %s", session_id, e)
             return False
 
     def save_ai_analysis(self, session_id: str, analysis_text: str, recommendations: list[str] | None = None):
         conn = self._get_conn()
         try:
+            conn.execute("BEGIN")
             conn.execute(
                 """INSERT INTO ai_analysis (session_id, analysis_text, recommendations, created_at)
                    VALUES (?, ?, ?, ?)""",
@@ -276,9 +283,12 @@ class HistoryDB:
                     datetime.now().isoformat(),
                 ),
             )
-            conn.commit()
+            conn.execute("COMMIT")
         except Exception as e:
-            conn.rollback()
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
             logger.error("Failed to save AI analysis: %s", e)
 
     def get_stats(self) -> dict:

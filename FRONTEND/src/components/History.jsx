@@ -37,7 +37,7 @@ export default function History() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    {s.timestamp ? new Date(s.timestamp).toLocaleString() : ''}
+                    {s.date ? new Date(s.date).toLocaleString() : ''}
                   </div>
                   <div style={{ fontSize: 12, color: s.status === 'completed' ? 'var(--success)' : 'var(--warning)', marginTop: 2 }}>
                     {s.status}

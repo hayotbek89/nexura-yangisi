@@ -16,9 +16,9 @@ RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY BACKEND/requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install --no-cache-dir --user \
+RUN pip install --no-cache-dir \
     llama-cpp-python
 
 # ---- Runtime ----
@@ -30,8 +30,7 @@ RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=python-deps /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+COPY --from=python-deps /usr/local /usr/local
 
 COPY --from=frontend /app/dist ./FRONTEND/dist
 

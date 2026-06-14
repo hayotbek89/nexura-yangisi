@@ -68,8 +68,8 @@ export default function Settings() {
               padding: '8px 0', borderBottom: '1px solid var(--border)',
             }}>
               <span>{name}</span>
-              <span style={{ color: info.available ? 'var(--success)' : 'var(--danger)' }}>
-                {info.available ? 'O\'rnatilgan' : 'Yo\'q'}
+              <span style={{ color: (typeof info === 'boolean' ? info : info.available) ? 'var(--success)' : 'var(--danger)' }}>
+                {(typeof info === 'boolean' ? info : info.available) ? "O'rnatilgan" : "Yo'q"}
               </span>
             </div>
           ))}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import asyncio
 import base64
 import json
@@ -8,6 +9,8 @@ import os
 import shutil
 import sys
 import threading
+import shlex
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -39,12 +42,34 @@ FRONTEND_DIST = config.PROJECT_ROOT / "FRONTEND" / "dist"
 
 _IS_PRODUCTION = config.IS_PRODUCTION
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if not hasattr(app.state, "runner"):
+        app.state.runner = ScanRunner()
+        app.state.reporter = ReportGenerator()
+        app.state.scanner = NetworkScanner()
+        app.state.history_db = HistoryDB()
+        app.state.engine = AIEngine()
+        app.state.selector = ToolSelector(app.state.engine) if app.state.engine.is_ready else None
+        app.state.cve_lookup = CVELookup()
+    yield
+    if hasattr(app.state, "cve_lookup"):
+        await app.state.cve_lookup.close()
+    if hasattr(app.state, "engine"):
+        app.state.engine.close()
+    if hasattr(app.state, "runner"):
+        app.state.runner.close()
+
+
 app = FastAPI(
     title="Nexura Scanner",
     version="2.0.0",
     docs_url=None if _IS_PRODUCTION else "/docs",
     redoc_url=None if _IS_PRODUCTION else "/redoc",
+    lifespan=lifespan,
 )
+
+app.mount("/reports", StaticFiles(directory=str(config.REPORTS_DIR)), name="reports")
 
 if FRONTEND_DIST.exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
@@ -114,26 +139,7 @@ def _verify_token(request: Request):
     raise HTTPException(status_code=401, detail="Unauthorized. Set NEXURA_API_KEY env var or pass Bearer token.")
 
 
-@app.on_event("startup")
-def _init_app():
-    if not hasattr(app.state, "runner"):
-        app.state.runner = ScanRunner()
-        app.state.reporter = ReportGenerator()
-        app.state.scanner = NetworkScanner()
-        app.state.history_db = HistoryDB()
-        app.state.engine = AIEngine()
-        app.state.selector = ToolSelector(app.state.engine) if app.state.engine.is_ready else None
-        app.state.cve_lookup = CVELookup()
-
-
-@app.on_event("shutdown")
-async def _shutdown_app():
-    if hasattr(app.state, "cve_lookup"):
-        await app.state.cve_lookup.close()
-    if hasattr(app.state, "engine"):
-        app.state.engine.close()
-    if hasattr(app.state, "runner"):
-        app.state.runner.close()
+# Lifespan managed startup/shutdown
 
 
 @app.exception_handler(Exception)
@@ -169,8 +175,18 @@ class ScanRequest(BaseModel):
     agentic: bool = False
 
 
+class ChatRequest(BaseModel):
+    message: str = Field(max_length=2000)
+    target: str | None = Field(default=None, max_length=500)
+    agentic: bool = False
+
+
 class QuickScanRequest(BaseModel):
     target: str = Field(max_length=500)
+
+
+class TerminalRequest(BaseModel):
+    cmd: str = Field(max_length=1000)
 
 
 def _get_engine(request: Request) -> AIEngine:
@@ -245,13 +261,14 @@ async def start_scan(req: ScanRequest, request: Request, _=Depends(_verify_token
         except Exception as e:
             logger.warning("CVE enrichment failed for %s: %s", report.technologies["cms"], e, exc_info=True)
 
+    relative_report_html = f"/reports/{Path(html_path).name}" if html_path else None
     return {
         "id": report.id,
         "target": report.target,
         "intent": plan.intent,
         "tools": [t.tool for t in plan.tools],
         "results": [r.model_dump(mode="json", exclude_none=True) for r in report.results],
-        "report_html": html_path,
+        "report_html": relative_report_html,
         "technologies": report.technologies,
     }
 
@@ -281,12 +298,14 @@ async def quick_scan(req: QuickScanRequest, request: Request, _=Depends(_verify_
 
 
 @app.get("/api/status")
-async def status(request: Request, _=Depends(_verify_token)):
+async def status(request: Request):
     engine = _get_engine(request)
+    is_ready = engine.is_ready
     return {
         "name": "Nexura Scanner",
         "version": "2.0.0",
-        "ai_ready": engine.is_ready,
+        "ai_ready": is_ready,
+        "model_loaded": is_ready,
         "tools": _check_tools(),
     }
 
@@ -404,94 +423,217 @@ def _check_tools() -> dict:
             }
             if t in extra and os.path.exists(extra[t]):
                 path = extra[t]
-        result[t] = path is not None
+        result[t] = {"available": path is not None}
     return result
 
 
-# Shared terminal state for /api/terminal
-_terminal_cwd_lock = threading.Lock()
-_terminal_cwd = str(config.BASE_DIR)
-_terminal_run_lock = threading.Lock()
+@app.get("/api/reports")
+async def list_reports(request: Request, _=Depends(_verify_token)):
+    reports_dir = config.REPORTS_DIR
+    if not reports_dir.exists():
+        return {"files": []}
+    files = []
+    for f in sorted(reports_dir.glob("*.html"), key=lambda p: p.stat().st_mtime, reverse=True):
+        files.append({
+            "name": f.name,
+            "path": f"/reports/{f.name}",
+            "size": f"{round(f.stat().st_size / 1024, 1)} KB",
+            "date": datetime.fromtimestamp(f.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+        })
+    return {"files": files}
+
+
+@app.post("/api/chat")
+async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_token)):
+    state = request.app.state
+    message = req.message.strip()
+    
+    if not state.engine.is_ready:
+        return {
+            "response": "AI hozir offline. Terminal orqali ishlashingiz mumkin.",
+            "scan_data": None
+        }
+    
+    # Check if the user is asking for a security scan
+    scan_keywords = ("scan", "skaner", "tekshir", "port", "nmap", "nuclei", "nikto", "sqlmap", "gobuster", "amass", "whatweb", "cve", "zaiflik")
+    is_scan_request = any(kw in message.lower() for kw in scan_keywords)
+    
+    if is_scan_request:
+        selector = _get_selector(request)
+        if not selector:
+            engine = state.engine
+            selector = ToolSelector(engine)
+            state.selector = selector
+
+        plan = await selector.create_plan_async(message, req.target)
+        report = state.reporter.create_report(plan.target, plan.intent)
+
+        if req.agentic and selector.engine.is_ready:
+            results = await selector.run_agentic_scan_async(message, plan.target, state.runner)
+            report.results = results
+        else:
+            for tc in plan.tools:
+                result = await state.runner.run_async(tc, plan.target)
+                report.results.append(result)
+
+        report.end_time = datetime.now()
+        report.status = "completed"
+
+        try:
+            tech_url = plan.target if "://" in plan.target else f"https://{plan.target}"
+            report.technologies = state.scanner.detect_technologies(tech_url)
+        except Exception as e:
+            logger.warning("Technology detection failed for %s: %s", plan.target, e, exc_info=True)
+
+        html_path = state.reporter.save(report, fmt="both")
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, state.history_db.save_session, report, report.technologies)
+
+        if report.technologies and report.technologies.get("cms"):
+            try:
+                cve_results = await state.cve_lookup.lookup_by_service(report.technologies["cms"], "")
+                if not report.results:
+                    report.results.append(
+                        ScanResult(tool="cve", target=plan.target, start_time=datetime.now(), success=True)
+                    )
+                for cv in cve_results:
+                    if not any(v.cve == cv.cve_id for r in report.results for v in r.vulnerabilities):
+                        report.results[0].vulnerabilities.append(Vulnerability(
+                            name=f"CVE: {cv.cve_id} — {cv.description[:100]}",
+                            severity=cv.severity,
+                            cve=cv.cve_id,
+                            cvss=cv.cvss_score,
+                            url=cv.url,
+                        ))
+            except Exception as e:
+                logger.warning("CVE enrichment failed for %s: %s", report.technologies["cms"], e, exc_info=True)
+
+        relative_report_html = f"/reports/{Path(html_path).name}" if html_path else None
+        
+        # Build AI response summary
+        ai_response = f"Men **{plan.target}** bo'yicha skanerlash rejasini tuzdim va quyidagi vositalarni ishga tushirdim:\n"
+        for tc in plan.tools:
+            ai_response += f"- **{tc.tool.value.upper()}**: {tc.description}\n"
+        
+        ai_response += f"\n**Tahlil natijasi (Reasoning):** {plan.reasoning}\n\n"
+        
+        total_vulns = sum(len(r.vulnerabilities) for r in report.results)
+        total_ports = sum(len(r.ports) for r in report.results)
+        ai_response += f"Skanerlash muvaffaqiyatli yakunlandi. Jami **{total_ports} ta ochiq port** va **{total_vulns} ta zaiflik** aniqlandi."
+        
+        return {
+            "response": ai_response,
+            "scan_data": {
+                "id": report.id,
+                "target": report.target,
+                "intent": plan.intent,
+                "results": [r.model_dump(mode="json", exclude_none=True) for r in report.results],
+                "report_html": relative_report_html,
+                "technologies": report.technologies,
+            }
+        }
+    else:
+        engine = state.engine
+        if not engine.is_ready:
+            return {
+                "response": "Assalomu alaykum! Hozirda AI yordamchisi vaqtincha mavjud emas. Terminal orqali to'g'ridan-to'g'ri skanerlash buyruqlarini ishlatishingiz mumkin. Masalan: nmap -F example.com",
+                "scan_data": None
+            }
+        
+        system_prompt = (
+            "Siz NEXURA — AI quvvatli zaiflik skaneri yordamchisisiz. "
+            "Kiberxavfsizlik, skanerlash vositalari (nmap, nuclei, nikto va h.k.) haqidagi savollarga javob bering. "
+            "Javoblaringiz qisqa, tushunarli va professional kiberxavfsizlik mutaxassisi uslubida bo'lsin. Markdown formatidan foydalaning."
+        )
+        
+        try:
+            ai_response = await engine.ask_async(system_prompt, message)
+            return {
+                "response": ai_response,
+                "scan_data": None
+            }
+        except Exception as e:
+            return {
+                "response": f"AI modeldan javob olishda xatolik yuz berdi: {e}",
+                "scan_data": None
+            }
+
 
 ALLOWED_TERMINAL_COMMANDS = frozenset({
-    "nmap", "nuclei", "nikto", "gobuster", "sqlmap",
-    "ping", "nslookup", "tracert", "traceroute",
-    "netstat", "ipconfig", "systeminfo", "hostname", "ver",
-    "dig", "arp", "route",
-    "ls", "dir", "cd", "pwd", "echo", "type", "more", "cls", "clear",
-    "tasklist",
-    "python", "pip",
+    "nmap", "nuclei", "nikto", "sqlmap", "gobuster", "amass", "whatweb",
+    "ping", "nslookup", "dig", "traceroute", "tracert", "ls", "dir", "pwd"
 })
 
-
-def _terminal_is_allowed(cmd: str) -> bool:
-    cmd_name = cmd.strip().split(None, 1)[0].lower().lstrip(".")
-    return cmd_name in ALLOWED_TERMINAL_COMMANDS
-
-
 @app.post("/api/terminal")
-async def terminal(request: Request, _=Depends(_verify_token)):
-    global _terminal_cwd, _terminal_process
-    data = await request.json()
-    cmd = (data.get("cmd", "") or "").strip()
-    confirm = data.get("confirm", False)
-
+async def run_terminal(req: TerminalRequest, request: Request, _=Depends(_verify_token)):
+    cmd = req.cmd.strip()
     if not cmd:
-        return {"output": "", "error": "", "code": -1}
+        return {"output": "", "error": "Bo'sh buyruq", "code": -1}
 
-    if cmd.startswith("cd"):
-        parts = cmd.split(None, 1)
-        target = (parts[1] if len(parts) > 1 else "").strip().strip('"').strip("'")
-        with _terminal_cwd_lock:
-            if not target or target == "~":
-                new_path = config.BASE_DIR
-            else:
-                base = Path(_terminal_cwd) if not Path(target).is_absolute() else Path()
-                new_path = (base / target).resolve()
-            try:
-                new_path.relative_to(config.BASE_DIR)
-            except ValueError:
-                return {"output": "", "error": "Cannot go outside project directory", "code": 1}
-            if new_path.exists() and new_path.is_dir():
-                _terminal_cwd = str(new_path)
-                return {"output": "", "error": "", "code": 0}
-            else:
-                return {"output": "", "error": f"Directory not found: {target}", "code": 1}
+    try:
+        cmd_args = shlex.split(cmd)
+    except Exception as e:
+        return {"output": "", "error": f"Buyruq formatida xatolik: {e}", "code": -1}
 
-    if not _terminal_is_allowed(cmd):
-        return {"danger": True, "message": "Buyruq ruxsat etilmagan", "cmd": cmd}
+    if not cmd_args:
+        return {"output": "", "error": "Bo'sh buyruq", "code": -1}
 
-    return await _run_terminal_cmd(cmd)
+    binary = cmd_args[0]
+    binary_clean = binary.lower().lstrip(".").rstrip(".exe")
+    
+    if binary_clean not in ALLOWED_TERMINAL_COMMANDS:
+        return {
+            "output": "",
+            "error": f"Xavfsizlik cheklovi: '{binary}' buyrug'i ruxsat etilmagan. Faqat skanerlash (nmap, nuclei, nikto, sqlmap, gobuster, amass, whatweb) va diagnostika (ping, nslookup, dig, traceroute) buyruqlaridan foydalaning.",
+            "code": 1
+        }
 
+    binary_path = shutil.which(binary)
+    if not binary_path and sys.platform == "win32":
+        extra = {
+            "nmap": r"C:\Program Files\nmap\nmap.exe",
+            "nuclei": os.path.expanduser(r"~\nuclei\nuclei.exe"),
+            "whatweb": os.path.expanduser(r"~\whatweb\whatweb.exe"),
+        }
+        if binary_clean in extra and os.path.exists(extra[binary_clean]):
+            binary_path = extra[binary_clean]
 
-async def _run_terminal_cmd(cmd: str) -> dict:
-    global _terminal_process
-    safe_cmd = cmd.replace("`", "``").replace("$", "`$")
-    ps_cmd = (
-        "$ProgressPreference='SilentlyContinue'; "
-        "$ExecutionContext.SessionState.LanguageMode='ConstrainedLanguage'; "
-        + safe_cmd
-    )
-    encoded = base64.b64encode(ps_cmd.encode("utf-16-le")).decode("ascii")
+    if not binary_path and binary_clean not in ("dir", "pwd", "ls"):
+        return {"output": "", "error": f"Dastur topilmadi: '{binary}'. Serverga o'rnatilganligini tekshiring.", "code": 1}
 
-    with _terminal_run_lock:
-        try:
+    try:
+        if binary_clean == "pwd" or (binary_clean == "ls" and sys.platform != "win32"):
             proc = await asyncio.create_subprocess_exec(
-                "powershell", "-NoProfile", "-NonInteractive",
-                "-ExecutionPolicy", "Bypass",
-                "-EncodedCommand", encoded,
+                binary_clean, *cmd_args[1:],
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                cwd=str(config.BASE_DIR)
             )
-            try:
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
-            except asyncio.TimeoutError:
-                proc.kill()
-                await proc.wait()
-                return {"output": "", "error": "Command timed out (30s)", "code": -1}
+        elif binary_clean == "dir" or (binary_clean == "ls" and sys.platform == "win32"):
+            proc = await asyncio.create_subprocess_exec(
+                "cmd", "/c", "dir", *cmd_args[1:],
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(config.BASE_DIR)
+            )
+        else:
+            proc = await asyncio.create_subprocess_exec(
+                binary_path, *cmd_args[1:],
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(config.BASE_DIR)
+            )
 
-            output = stdout.decode("utf-8", errors="replace") if stdout else ""
-            error = stderr.decode("utf-8", errors="replace") if stderr else ""
-            return {"output": output, "error": error, "code": proc.returncode or 0}
-        except Exception as e:
-            return {"output": "", "error": str(e), "code": -1}
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=config.TIMEOUT)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            return {"output": "", "error": f"Buyruq bajarilishi {config.TIMEOUT} soniyadan oshib ketdi va bekor qilindi.", "code": -1}
+
+        output = stdout.decode("utf-8", errors="replace") if stdout else ""
+        error = stderr.decode("utf-8", errors="replace") if stderr else ""
+        return {"output": output, "error_log": error, "code": proc.returncode or 0}
+
+    except Exception as e:
+        return {"output": "", "error": f"Xatolik yuz berdi: {e}", "code": -1}

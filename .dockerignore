@@ -7,9 +7,8 @@ __pycache__/
 .vite/
 node_modules/
 FRONTEND/node_modules/
-FRONTEND/src/
-FRONTEND/public/
 FRONTEND/*.config.js
+FRONTEND/dist/
 BACKEND/reports/
 LOCAL_AI_MODELS/
 *.gguf
@@ -21,7 +20,6 @@ BACKEND/tests/
 SCANNING_TOOLS/
 *.md
 *.bat
-BACKEND/scripts/
 **/.gitkeep
 .env
 .env.production

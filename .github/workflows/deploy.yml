@@ -2,7 +2,7 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: [main]
+    branches: [master]
 
 jobs:
   deploy:
@@ -15,9 +15,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
-            cd /opt/nexura
-            git pull
-            cd FRONTEND
-            npm run build
-            cd ..
-            systemctl restart nexura
+            cd /opt/nexura-scanner
+            git pull origin master
+            docker compose build
+            docker compose up -d

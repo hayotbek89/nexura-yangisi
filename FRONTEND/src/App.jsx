@@ -8,6 +8,7 @@ import History from './components/History'
 import Reports from './components/Reports'
 import Settings from './components/Settings'
 import AccessKeyGate from './components/AccessKeyGate'
+import BackgroundPattern from './components/BackgroundPattern'
 import './App.css'
 
 export default function App() {
@@ -20,8 +21,9 @@ export default function App() {
   }
 
   return (
-    <AccessKeyGate>
-      <ThemeProvider>
+    <ThemeProvider>
+      <BackgroundPattern />
+      <AccessKeyGate>
       <ScannerProvider>
         <ErrorBoundary>
           <Sidebar page={page} onNavigate={(p) => { setPage(p); setMenuOpen(false) }} menuOpen={menuOpen} onToggle={() => setMenuOpen(!menuOpen)} />
@@ -45,7 +47,7 @@ export default function App() {
           </div>
         </ErrorBoundary>
       </ScannerProvider>
-      </ThemeProvider>
-    </AccessKeyGate>
+      </AccessKeyGate>
+    </ThemeProvider>
   )
 }

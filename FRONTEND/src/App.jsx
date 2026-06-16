@@ -6,16 +6,32 @@ import Scanner from './components/Scanner'
 import History from './components/History'
 import Reports from './components/Reports'
 import Settings from './components/Settings'
+import Login from './components/Login'
 import './App.css'
 
 export default function App() {
   const [page, setPage] = useState('scanner')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    localStorage.getItem('nexura_auth') === 'true'
+  )
+
+  if (!isAuthenticated) {
+    return <Login onLogin={() => {
+      localStorage.setItem('nexura_auth', 'true')
+      setIsAuthenticated(true)
+    }} />
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('nexura_auth')
+    setIsAuthenticated(false)
+  }
 
   return (
     <ScannerProvider>
       <ErrorBoundary>
-        <Sidebar page={page} onNavigate={(p) => { setPage(p); setMenuOpen(false) }} menuOpen={menuOpen} onToggle={() => setMenuOpen(!menuOpen)} />
+        <Sidebar page={page} onNavigate={(p) => { setPage(p); setMenuOpen(false) }} menuOpen={menuOpen} onToggle={() => setMenuOpen(!menuOpen)} onLogout={handleLogout} />
         <div style={{
           flex: 1, padding: '24px', overflow: 'auto',
           marginLeft: window.innerWidth < 768 ? 0 : undefined,

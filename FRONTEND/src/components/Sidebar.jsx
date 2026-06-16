@@ -84,7 +84,7 @@ const pages = [
   { id: 'settings', label: 'Sozlamalar', icon: '⚙️' },
 ]
 
-export default function Sidebar({ page, onNavigate, menuOpen, onToggle }) {
+export default function Sidebar({ page, onNavigate, menuOpen, onToggle, onLogout }) {
   const isMobile = window.innerWidth < 768
 
   const sidebarStyle = {
@@ -132,6 +132,18 @@ export default function Sidebar({ page, onNavigate, menuOpen, onToggle }) {
             </NavButton>
           ))}
         </nav>
+        <div style={{ padding: '0 12px', marginTop: 'auto' }}>
+          <NavButton active={false} onClick={onLogout}>
+            <div id="clip">
+              <div id="leftTop" className="corner" />
+              <div id="rightBottom" className="corner" />
+              <div id="rightTop" className="corner" />
+              <div id="leftBottom" className="corner" />
+              <span>🚪</span>
+              Chiqish
+            </div>
+          </NavButton>
+        </div>
       </aside>
     </>
   )

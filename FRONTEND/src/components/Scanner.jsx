@@ -232,7 +232,7 @@ const OutputLine = styled.pre`
 `
 
 const InputRow = styled.div`
-  padding: 4px;
+  padding: 8px 4px 4px;
 `
 
 const TerminalInput2 = styled.input`

@@ -17,21 +17,18 @@ export default function App() {
   )
 
   if (!isAuthenticated) {
-    return <Login onLogin={() => {
-      localStorage.setItem('nexura_auth', 'true')
-      setIsAuthenticated(true)
-    }} />
+    return <Login onLogin={() => setIsAuthenticated(true)} />
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('nexura_auth')
-    setIsAuthenticated(false)
+    localStorage.removeItem('nexura_auth');
+    window.location.reload();
   }
 
   return (
     <ScannerProvider>
       <ErrorBoundary>
-        <Sidebar page={page} onNavigate={(p) => { setPage(p); setMenuOpen(false) }} menuOpen={menuOpen} onToggle={() => setMenuOpen(!menuOpen)} onLogout={handleLogout} />
+        <Sidebar page={page} onNavigate={(p) => { setPage(p); setMenuOpen(false) }} menuOpen={menuOpen} onToggle={() => setMenuOpen(!menuOpen)} />
         <div style={{
           flex: 1, padding: '24px', overflow: 'auto',
           marginLeft: window.innerWidth < 768 ? 0 : undefined,

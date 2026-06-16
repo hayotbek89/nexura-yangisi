@@ -84,7 +84,7 @@ const pages = [
   { id: 'settings', label: 'Sozlamalar', icon: '⚙️' },
 ]
 
-export default function Sidebar({ page, onNavigate, menuOpen, onToggle, onLogout }) {
+export default function Sidebar({ page, onNavigate, menuOpen, onToggle }) {
   const isMobile = window.innerWidth < 768
 
   const sidebarStyle = {
@@ -133,16 +133,22 @@ export default function Sidebar({ page, onNavigate, menuOpen, onToggle, onLogout
           ))}
         </nav>
         <div style={{ padding: '0 12px', marginTop: 'auto' }}>
-          <NavButton active={false} onClick={onLogout}>
-            <div id="clip">
-              <div id="leftTop" className="corner" />
-              <div id="rightBottom" className="corner" />
-              <div id="rightTop" className="corner" />
-              <div id="leftBottom" className="corner" />
-              <span>🚪</span>
-              Chiqish
-            </div>
-          </NavButton>
+          <button onClick={() => {
+            localStorage.removeItem('nexura_auth');
+            window.location.reload();
+          }} style={{
+            background: 'transparent',
+            border: '1px solid #e74c3c',
+            color: '#e74c3c',
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            letterSpacing: '2px',
+            padding: '8px 12px',
+            cursor: 'pointer',
+            width: '100%',
+          }}>
+            ⏻ CHIQISH
+          </button>
         </div>
       </aside>
     </>

@@ -1,282 +1,358 @@
-import React, { useState, useEffect } from 'react'
-import styled, { keyframes } from 'styled-components'
-
-const SECRET_KEY = 'nexura-shadow-9685'
-const MAX_ATTEMPTS = 3
-const BLOCK_DURATION = 5 * 60 * 1000
+import { useState, useEffect, useRef } from "react";
+import styled, { keyframes } from "styled-components";
 
 const glitch = keyframes`
-  0% { text-shadow: 2px 0 #27c39f, -2px 0 #2761c3; }
-  25% { text-shadow: -2px 0 #27c39f, 2px 0 #2761c3; }
-  50% { text-shadow: 2px 2px #27c39f, -2px -2px #2761c3; }
-  75% { text-shadow: -2px 2px #27c39f, 2px -2px #2761c3; }
-  100% { text-shadow: 2px 0 #27c39f, -2px 0 #2761c3; }
-`
+  0%, 90%, 100% { text-shadow: 2px 0 #27c39f, -2px 0 #2761c3; }
+  92% { text-shadow: -3px 0 #27c39f, 3px 0 #2761c3; }
+  94% { text-shadow: 3px 0 #27c39f, -3px 0 #2761c3; }
+  96% { text-shadow: -2px 0 #27c39f, 2px 0 #2761c3; }
+`;
+
+const scan = keyframes`
+  0% { top: 0; }
+  100% { top: 100%; }
+`;
 
 const shake = keyframes`
   0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
-  20%, 40%, 60%, 80% { transform: translateX(6px); }
-`
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+`;
 
-const flashGreen = keyframes`
-  0% { box-shadow: 0 0 0 0 rgba(39, 195, 159, 0.6); }
-  50% { box-shadow: 0 0 40px 10px rgba(39, 195, 159, 0.3); }
-  100% { box-shadow: 0 0 0 0 rgba(39, 195, 159, 0); }
-`
+const blink = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+`;
 
-const particleFall = keyframes`
-  0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
-  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-`
-
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-`
-
-const Wrapper = styled.div`
-  position: relative;
-  min-height: 100vh;
-  min-height: 100dvh;
+const Wrap = styled.div`
+  position: fixed;
+  inset: 0;
   background: #0a0e1a;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: 'Share Tech Mono', monospace;
   overflow: hidden;
-  font-family: 'Courier New', monospace;
-`
+  z-index: 9999;
+`;
 
-const ParticleCanvas = styled.div`
+const ScanLine = styled.div`
   position: absolute;
-  inset: 0;
-  overflow: hidden;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(39,195,159,0.3), transparent);
+  animation: ${scan} 4s linear infinite;
   pointer-events: none;
-
-  span {
-    position: absolute;
-    color: #27c39f;
-    font-size: 10px;
-    opacity: 0.15;
-    animation: ${particleFall} ${props => props.duration || '8s'} linear infinite;
-    animation-delay: ${props => props.delay || '0s'};
-    top: -10%;
-  }
-`
+`;
 
 const Card = styled.div`
   position: relative;
-  z-index: 1;
-  background: rgba(10, 14, 26, 0.9);
+  z-index: 10;
+  width: 340px;
+  padding: 40px 32px;
+  background: rgba(10, 14, 26, 0.95);
   border: 1px solid #2761c3;
-  box-shadow: 0 0 30px rgba(39, 195, 159, 0.1), inset 0 0 60px rgba(39, 195, 159, 0.03);
-  clip-path: polygon(12px 0%, calc(100% - 12px) 0%, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0% calc(100% - 12px), 0% 12px);
-  padding: 48px 40px;
-  width: 100%;
-  max-width: 420px;
-  animation: ${fadeIn} 0.6s ease-out;
-`
+  clip-path: polygon(
+    12px 0%, calc(100% - 12px) 0%,
+    100% 12px, 100% calc(100% - 12px),
+    calc(100% - 12px) 100%, 12px 100%,
+    0% calc(100% - 12px), 0% 12px
+  );
+  box-shadow: 0 0 40px rgba(39, 97, 195, 0.15);
+`;
 
-const Logo = styled.div`
-  font-size: 36px;
-  font-weight: 800;
+const Corner = styled.div`
+  position: absolute;
+  width: 8px; height: 8px;
+  background: #27c39f;
+  transform: rotate(45deg);
+  ${p => p.tl && 'top: -4px; left: -4px;'}
+  ${p => p.tr && 'top: -4px; right: -4px;'}
+  ${p => p.bl && 'bottom: -4px; left: -4px;'}
+  ${p => p.br && 'bottom: -4px; right: -4px;'}
+`;
+
+const LogoText = styled.div`
+  font-size: 32px;
+  font-weight: 700;
   color: #27c39f;
+  letter-spacing: 8px;
+  animation: ${glitch} 3s infinite;
   text-align: center;
-  letter-spacing: 6px;
-  margin-bottom: 8px;
-  animation: ${glitch} 2s infinite;
-`
+`;
 
-const Subtitle = styled.div`
-  text-align: center;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 11px;
+const LogoSub = styled.div`
+  font-size: 10px;
+  color: #2761c3;
   letter-spacing: 2px;
-  margin-bottom: 40px;
-  text-transform: uppercase;
-`
+  margin-top: 4px;
+  text-align: center;
+`;
 
-const InputWrapper = styled.div`
-  margin-bottom: 20px;
-`
+const Cursor = styled.span`
+  display: inline-block;
+  width: 8px; height: 14px;
+  background: #27c39f;
+  animation: ${blink} 1s infinite;
+  vertical-align: middle;
+  margin-left: 2px;
+`;
 
-const StyledInput = styled.input`
-  width: 100%;
-  padding: 14px 16px;
-  background: transparent;
-  border: 1px solid ${props => props.$hasError ? '#ff3355' : '#2761c3'};
+const Divider = styled.hr`
+  border: none;
+  border-top: 1px solid #2761c3;
+  margin: 20px 0;
+  opacity: 0.4;
+`;
+
+const Label = styled.span`
+  font-size: 11px;
   color: #27c39f;
-  font-family: 'Courier New', monospace;
-  font-size: 14px;
-  outline: none;
-  clip-path: polygon(6px 0%, calc(100% - 6px) 0%, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0% calc(100% - 6px), 0% 6px);
-  transition: border-color 0.2s, box-shadow 0.2s;
-  box-sizing: border-box;
-  animation: ${props => props.$shake ? shake : props.$flash ? flashGreen : 'none'} 0.5s ease;
+  letter-spacing: 2px;
+  display: block;
+  margin-bottom: 8px;
+`;
 
+const InputWrap = styled.div`
+  position: relative;
+  margin-bottom: 20px;
+`;
+
+const InputIcon = styled.span`
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #2761c3;
+  font-size: 16px;
+`;
+
+const Input = styled.input`
+  width: 100%;
+  background: rgba(39, 97, 195, 0.08);
+  border: 1px solid #2761c3;
+  color: #ddebf0;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 14px;
+  padding: 12px 16px 12px 36px;
+  outline: none;
+  box-sizing: border-box;
+  clip-path: polygon(
+    6px 0%, calc(100% - 6px) 0%,
+    100% 6px, 100% calc(100% - 6px),
+    calc(100% - 6px) 100%, 6px 100%,
+    0% calc(100% - 6px), 0% 6px
+  );
+  transition: border-color 0.2s, box-shadow 0.2s;
   &:focus {
     border-color: #27c39f;
-    box-shadow: 0 0 12px rgba(39, 195, 159, 0.2);
+    box-shadow: 0 0 12px rgba(39,195,159,0.2);
   }
+  &::placeholder { color: rgba(221,235,240,0.3); }
+`;
 
-  &::placeholder {
-    color: rgba(39, 195, 159, 0.3);
-  }
-`
-
-const LoginButton = styled.button`
+const Btn = styled.button`
   width: 100%;
-  padding: 14px;
   background: transparent;
   border: 1px solid #27c39f;
   color: #27c39f;
-  font-family: 'Courier New', monospace;
+  font-family: 'Share Tech Mono', monospace;
   font-size: 13px;
-  font-weight: bold;
   letter-spacing: 3px;
+  padding: 14px;
   cursor: pointer;
-  clip-path: polygon(8px 0%, calc(100% - 8px) 0%, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0% calc(100% - 8px), 0% 8px);
-  transition: background 0.2s, box-shadow 0.2s;
-
-  &:hover:not(:disabled) {
-    background: rgba(39, 195, 159, 0.1);
-    box-shadow: 0 0 20px rgba(39, 195, 159, 0.2);
+  clip-path: polygon(
+    8px 0%, calc(100% - 8px) 0%,
+    100% 8px, 100% calc(100% - 8px),
+    calc(100% - 8px) 100%, 8px 100%,
+    0% calc(100% - 8px), 0% 8px
+  );
+  transition: all 0.2s;
+  &:hover {
+    background: rgba(39,195,159,0.1);
+    box-shadow: 0 0 20px rgba(39,195,159,0.3);
   }
+  &:active { transform: scale(0.98); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+`;
 
-  &:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-`
-
-const ErrorText = styled.div`
-  color: #ff3355;
+const Status = styled.div`
+  height: 20px;
+  text-align: center;
   font-size: 11px;
-  text-align: center;
-  margin-top: 16px;
   letter-spacing: 1px;
-`
+  margin-bottom: 12px;
+  color: ${p => p.error ? '#e74c3c' : '#27c39f'};
+  animation: ${p => p.error ? shake : 'none'} 0.3s;
+`;
 
-const BlockText = styled.div`
-  color: #ff3355;
-  font-size: 12px;
-  text-align: center;
+const Warning = styled.div`
   margin-top: 16px;
-  letter-spacing: 1px;
-`
-
-const Hint = styled.div`
-  color: rgba(255, 255, 255, 0.2);
   font-size: 10px;
+  color: rgba(39,97,195,0.7);
   text-align: center;
-  margin-top: 24px;
   letter-spacing: 1px;
-`
+  span { color: #e74c3c; }
+`;
+
+const Footer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+  font-size: 9px;
+  color: rgba(39,97,195,0.5);
+  letter-spacing: 1px;
+`;
+
+const Canvas = styled.canvas`
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+`;
+
+const SECRET = 'nexura-shadow-9685';
+const MAX_ATTEMPTS = 3;
+const BLOCK_DURATION = 5 * 60 * 1000;
 
 export default function Login({ onLogin }) {
-  const [input, setInput] = useState('')
-  const [error, setError] = useState('')
-  const [shakeInput, setShakeInput] = useState(false)
-  const [flashInput, setFlashInput] = useState(false)
-  const [blockedUntil, setBlockedUntil] = useState(() => {
-    const stored = localStorage.getItem('nexura_blocked_until')
-    return stored ? parseInt(stored, 10) : 0
-  })
-  const [countdown, setCountdown] = useState(0)
+  const [value, setValue] = useState('');
+  const [status, setStatus] = useState({ text: '', error: false });
+  const [attempts, setAttempts] = useState(0);
+  const [blocked, setBlocked] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const canvasRef = useRef(null);
 
   useEffect(() => {
-    if (!blockedUntil || Date.now() > blockedUntil) {
-      setBlockedUntil(0)
-      setCountdown(0)
-      return
-    }
-    const tick = () => {
-      const remaining = Math.max(0, Math.ceil((blockedUntil - Date.now()) / 1000))
-      setCountdown(remaining)
-      if (remaining <= 0) {
-        setBlockedUntil(0)
-        localStorage.removeItem('nexura_blocked_until')
-        localStorage.removeItem('nexura_attempts')
+    const link = document.createElement('link');
+    link.href = 'https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap';
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+  }, []);
+
+  useEffect(() => {
+    const blockedAt = localStorage.getItem('nx_blocked');
+    if (blockedAt) {
+      const remaining = parseInt(blockedAt) + BLOCK_DURATION - Date.now();
+      if (remaining > 0) {
+        setBlocked(true);
+        setCountdown(Math.ceil(remaining / 1000));
+      } else {
+        localStorage.removeItem('nx_blocked');
       }
     }
-    tick()
-    const interval = setInterval(tick, 1000)
-    return () => clearInterval(interval)
-  }, [blockedUntil])
+  }, []);
 
-  const handleSubmit = () => {
-    if (blockedUntil && Date.now() < blockedUntil) return
+  useEffect(() => {
+    if (!countdown) return;
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setBlocked(false);
+          localStorage.removeItem('nx_blocked');
+          setStatus({ text: '', error: false });
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [countdown]);
 
-    if (input === SECRET_KEY) {
-      setError('')
-      setFlashInput(true)
-      setTimeout(() => {
-        onLogin()
-      }, 400)
-      return
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const wrap = canvas.parentElement;
+    canvas.width = wrap.offsetWidth;
+    canvas.height = wrap.offsetHeight;
+    const particles = Array.from({ length: 50 }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      size: Math.random() * 2 + 0.5,
+      speedY: -(Math.random() * 0.5 + 0.2),
+      opacity: Math.random() * 0.5 + 0.1,
+      color: Math.random() > 0.5 ? '#27c39f' : '#2761c3',
+    }));
+    let raf;
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.opacity;
+        ctx.fill();
+        p.y += p.speedY;
+        if (p.y < 0) { p.y = canvas.height; p.x = Math.random() * canvas.width; }
+      });
+      ctx.globalAlpha = 1;
+      raf = requestAnimationFrame(animate);
+    };
+    animate();
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const handleLogin = () => {
+    if (blocked) return;
+    if (value === SECRET) {
+      setStatus({ text: '✓ KIRISH TASDIQLANDI', error: false });
+      localStorage.setItem('nexura_auth', 'true');
+      setTimeout(() => onLogin(), 800);
+    } else {
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+      if (newAttempts >= MAX_ATTEMPTS) {
+        localStorage.setItem('nx_blocked', Date.now().toString());
+        setBlocked(true);
+        setCountdown(300);
+        setStatus({ text: '⛔ 5 DAQIQA BLOKLANDINGIZ', error: true });
+      } else {
+        setStatus({ text: `✗ KALIT NOTO'G'RI (${MAX_ATTEMPTS - newAttempts} URINISH QOLDI)`, error: true });
+      }
+      setValue('');
     }
+  };
 
-    const attempts = parseInt(localStorage.getItem('nexura_attempts') || '0', 10) + 1
-    localStorage.setItem('nexura_attempts', String(attempts))
-
-    setShakeInput(true)
-    setError(`Xato kalit! Urinish: ${attempts}/${MAX_ATTEMPTS}`)
-    setTimeout(() => setShakeInput(false), 500)
-
-    if (attempts >= MAX_ATTEMPTS) {
-      const until = Date.now() + BLOCK_DURATION
-      localStorage.setItem('nexura_blocked_until', String(until))
-      setBlockedUntil(until)
-      setError('')
-    }
-
-    setInput('')
-  }
-
-  const particles = Array.from({ length: 30 }, (_, i) => (
-    <span
-      key={i}
-      style={{
-        left: `${Math.random() * 100}%`,
-        animationDuration: `${6 + Math.random() * 8}s`,
-        animationDelay: `${Math.random() * 8}s`,
-      }}
-    >
-      {String.fromCharCode(0x30A0 + Math.floor(Math.random() * 96))}
-    </span>
-  ))
+  const mins = String(Math.floor(countdown / 60)).padStart(2, '0');
+  const secs = String(countdown % 60).padStart(2, '0');
 
   return (
-    <Wrapper>
-      <ParticleCanvas>{particles}</ParticleCanvas>
+    <Wrap>
+      <Canvas ref={canvasRef} />
+      <ScanLine />
       <Card>
-        <Logo>NEXURA</Logo>
-        <Subtitle>AI Kiberxavfsizlik Skaneri</Subtitle>
-        <form onSubmit={e => { e.preventDefault(); handleSubmit() }}>
-          <InputWrapper>
-            <StyledInput
-              type="password"
-              placeholder="🔑 Kirish kalitini kiriting..."
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              $shake={shakeInput}
-              $flash={flashInput}
-              disabled={!!(blockedUntil && Date.now() < blockedUntil)}
-              autoFocus
-            />
-          </InputWrapper>
-          <LoginButton type="submit" disabled={!!(blockedUntil && Date.now() < blockedUntil) || !input.trim()}>
-            TIZIMGA KIRISH
-          </LoginButton>
-        </form>
-        {error && <ErrorText>{error}</ErrorText>}
-        {countdown > 0 && (
-          <BlockText>
-            ⚠ Bloklangan! {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
-          </BlockText>
-        )}
-        <Hint>3 marta xato = 5 daqiqa bloklanish</Hint>
+        <Corner tl /><Corner tr /><Corner bl /><Corner br />
+        <div style={{ textAlign: 'center', marginBottom: 8 }}>
+          <LogoText>NEXURA<Cursor /></LogoText>
+          <LogoSub>AI KIBERXAVFSIZLIK SKANERI</LogoSub>
+        </div>
+        <Divider />
+        <Status error={status.error}>
+          {blocked ? `BLOK: ${mins}:${secs} QOLDI` : status.text}
+        </Status>
+        <Label>KIRISH KALITI</Label>
+        <InputWrap>
+          <InputIcon>🔑</InputIcon>
+          <Input
+            type="password"
+            placeholder="nexura-****-****"
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            maxLength={32}
+            disabled={blocked}
+          />
+        </InputWrap>
+        <Btn onClick={handleLogin} disabled={blocked}>
+          ⚡ TIZIMGA KIRISH
+        </Btn>
+        <Warning><span>⚠</span> 3 MARTA XATO = 5 DAQIQA BLOKLANISH</Warning>
+        <Footer>
+          <span>URINISH: {attempts}/{MAX_ATTEMPTS}</span>
+          <span>v2.0.0</span>
+        </Footer>
       </Card>
-    </Wrapper>
-  )
+    </Wrap>
+  );
 }

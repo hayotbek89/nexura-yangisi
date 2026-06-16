@@ -331,23 +331,50 @@ export default function Login({ onLogin }) {
         <Status error={status.error}>
           {blocked ? `BLOK: ${mins}:${secs} QOLDI` : status.text}
         </Status>
-        <Label>KIRISH KALITI</Label>
-        <InputWrap>
-          <InputIcon>🔑</InputIcon>
-          <Input
-            type="password"
-            placeholder="nexura-****-****"
-            value={value}
-            onChange={e => setValue(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            maxLength={32}
-            disabled={blocked}
-          />
-        </InputWrap>
+        <div className="relative w-full mx-auto font-mono">
+          <div className="relative p-4 bg-black border-2 border-green-400 rounded-lg shadow-lg overflow-hidden">
+            <div className="absolute top-0 left-0 w-6 h-1 bg-green-400" />
+            <div className="absolute top-0 left-0 w-1 h-6 bg-green-400" />
+            <div className="absolute top-0 right-0 w-6 h-1 bg-green-400" />
+            <div className="absolute top-0 right-0 w-1 h-6 bg-green-400" />
+            <div className="absolute bottom-0 left-0 w-6 h-1 bg-green-400" />
+            <div className="absolute bottom-0 left-0 w-1 h-6 bg-green-400" />
+            <div className="absolute bottom-0 right-0 w-6 h-1 bg-green-400" />
+            <div className="absolute bottom-0 right-0 w-1 h-6 bg-green-400" />
+            <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-transparent via-green-900/20 to-transparent" />
+            <label className="mb-3 text-green-400 text-sm tracking-wider flex items-center">
+              <span className="mr-2 text-green-600">➜</span>
+              <span className="text-green-300 font-bold">KIRISH KALITI</span>
+              <span className="ml-2 opacity-75 animate-pulse">▋</span>
+            </label>
+            <div className="relative">
+              <input
+                className="w-full bg-transparent text-green-300 text-base border-2 border-green-500 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-green-600 placeholder-green-600/60 pr-10"
+                placeholder="➤ KIRISH KALITINI KIRITING"
+                type="password"
+                value={value}
+                onChange={e => setValue(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                maxLength={32}
+                disabled={blocked}
+              />
+              <svg stroke="currentColor" viewBox="0 0 24 24" fill="none"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-green-500">
+                <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                  strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div className="absolute top-0 right-12 w-px h-4 bg-green-500/50" />
+            <div className="absolute top-0 right-16 w-px h-6 bg-green-500/30" />
+            <div className="absolute top-0 right-20 w-px h-2 bg-green-500/70" />
+            <div className="absolute bottom-0 left-12 w-px h-4 bg-green-500/50" />
+            <div className="absolute bottom-0 left-16 w-px h-6 bg-green-500/30" />
+            <div className="absolute bottom-0 left-20 w-px h-2 bg-green-500/70" />
+          </div>
+        </div>
         <Btn onClick={handleLogin} disabled={blocked}>
           ⚡ TIZIMGA KIRISH
         </Btn>
-        <Warning><span>⚠</span> 3 MARTA XATO = 5 DAQIQA BLOKLANISH</Warning>
         <Footer>
           <span>URINISH: {attempts}/{MAX_ATTEMPTS}</span>
           <span>v2.0.0</span>

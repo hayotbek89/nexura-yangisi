@@ -12,7 +12,7 @@ const NavButton = styled.button`
   border: none;
   font-size: 13px;
   font-weight: bold;
-  color: #ddebf0;
+  color: var(--text);
   cursor: pointer;
   margin-bottom: 8px;
 

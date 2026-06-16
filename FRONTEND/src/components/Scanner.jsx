@@ -64,13 +64,14 @@ const StyledWrapper = styled.div`
     outline: none;
     background: transparent;
     padding: 0 8px;
-    color: #ffffff;
+    color: var(--text);
     font-size: 13px;
     font-weight: 400;
     letter-spacing: -0.15px;
   }
   .pb-ai-input::placeholder {
-    color: rgba(255, 255, 255, 0.55);
+    color: var(--text-muted);
+    opacity: 0.6;
   }
   .pb-ai-input-btn {
     position: relative;
@@ -442,7 +443,7 @@ export default function Scanner() {
               }}>
                 <div style={{
                   background: log.role === 'user' ? 'var(--primary)' : 'var(--bg-input)',
-                  color: '#fff',
+                  color: log.role === 'user' ? '#fff' : 'var(--text)',
                   padding: '12px 16px',
                   borderRadius: log.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
                   fontSize: 14,
@@ -471,12 +472,12 @@ export default function Scanner() {
                       {log.scanData.technologies && (
                         <div style={{ marginBottom: 8, fontSize: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {log.scanData.technologies.cms && (
-                            <span style={{ background: 'rgba(124,58,237,0.2)', color: '#a78bfa', padding: '2px 6px', borderRadius: 4 }}>
+                            <span style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--critical)', padding: '2px 6px', borderRadius: 4 }}>
                               CMS: {log.scanData.technologies.cms}
                             </span>
                           )}
                           {log.scanData.technologies.server && (
-                            <span style={{ background: 'rgba(59,130,246,0.2)', color: '#93c5fd', padding: '2px 6px', borderRadius: 4 }}>
+                            <span style={{ background: 'rgba(59,130,246,0.2)', color: 'var(--primary)', padding: '2px 6px', borderRadius: 4 }}>
                               Server: {log.scanData.technologies.server}
                             </span>
                           )}
@@ -593,17 +594,16 @@ export default function Scanner() {
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          background: '#020617',
+          background: 'var(--terminal-bg, #020617)',
           borderRadius: 'var(--radius)',
-          border: '1px solid #1e293b',
+          border: '1px solid var(--border)',
           overflow: 'hidden',
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.3)',
         }}>
           {/* Terminal Header */}
           <div style={{
-            background: '#0f172a',
+            background: 'var(--terminal-header, #0f172a)',
             padding: '10px 16px',
-            borderBottom: '1px solid #1e293b',
+            borderBottom: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
             gap: 8,
@@ -618,7 +618,7 @@ export default function Scanner() {
               marginRight: 'auto',
               fontSize: 13,
               fontFamily: 'monospace',
-              color: '#94a3b8',
+              color: 'var(--text-muted)',
               fontWeight: 600
             }}>
               interactive-secure-shell (powershell-bypass-neutralized)
@@ -626,12 +626,12 @@ export default function Scanner() {
           </div>
 
           {/* Terminal Console View */}
-          <div style={{
+          <div className="terminal-console" style={{
             flex: 1,
             padding: 16,
             overflowY: 'auto',
-            background: '#020617',
-            color: '#10b981', // Emerald terminal color
+            background: 'var(--terminal-bg, #020617)',
+            color: 'var(--terminal-text, #10b981)',
             fontFamily: 'monospace',
             fontSize: 13,
             lineHeight: '1.6',
@@ -644,18 +644,17 @@ export default function Scanner() {
               <div key={idx} style={{
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-all',
-                color: log.startsWith('nexura@scanner') ? '#38bdf8' :
-                       log.startsWith('[ERROR]') ? '#ef4444' :
-                       log.startsWith('[FAIL]') ? '#f43f5e' :
-                       log.startsWith('[STDERR]') ? '#f59e0b' : '#10b981'
+                color: log.startsWith('nexura@scanner') ? 'var(--terminal-prompt, #38bdf8)' :
+                       log.startsWith('[ERROR]') || log.startsWith('[FAIL]') ? 'var(--danger)' :
+                       log.startsWith('[STDERR]') ? 'var(--warning)' : 'var(--terminal-text, #10b981)'
               }}>
                 {log}
               </div>
             ))}
 
             {terminalLoading && (
-              <div style={{ color: '#eab308', display: 'flex', gap: 6, alignItems: 'center' }}>
-                <span className="dot" style={{ width: 6, height: 6, background: '#eab308', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both' }} />
+              <div style={{ color: 'var(--warning)', display: 'flex', gap: 6, alignItems: 'center' }}>
+                <span className="dot" style={{ width: 6, height: 6, background: 'var(--warning)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both' }} />
                 <span>Buyruq bajarilmoqda, kuting...</span>
               </div>
             )}
@@ -666,13 +665,13 @@ export default function Scanner() {
           <form onSubmit={handleTerminalSubmit} style={{
             display: 'flex',
             alignItems: 'center',
-            background: '#090d16',
+            background: 'var(--terminal-input-bg, #090d16)',
             padding: '12px 16px',
-            borderTop: '1px solid #1e293b',
+            borderTop: '1px solid var(--border)',
           }}>
             <span style={{
               fontFamily: 'monospace',
-              color: '#38bdf8',
+              color: 'var(--terminal-prompt, #38bdf8)',
               fontSize: 13,
               marginRight: 8,
               userSelect: 'none',
@@ -690,10 +689,10 @@ export default function Scanner() {
                 background: 'transparent',
                 border: 'none',
                 outline: 'none',
-                color: '#10b981',
+                color: 'var(--terminal-text, #10b981)',
                 fontFamily: 'monospace',
                 fontSize: 13,
-                caretColor: '#10b981',
+                caretColor: 'var(--terminal-text, #10b981)',
                 width: '100%',
               }}
               autoFocus

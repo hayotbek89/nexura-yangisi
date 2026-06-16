@@ -29,6 +29,11 @@
   --danger: #dc2626;
   --warning: #d97706;
   --critical: #9333ea;
+  --terminal-bg: #f8fafc;
+  --terminal-header: #f1f5f9;
+  --terminal-input-bg: #f1f5f9;
+  --terminal-text: #075985;
+  --terminal-prompt: #0284c7;
 }
 
 * {

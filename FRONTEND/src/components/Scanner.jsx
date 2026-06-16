@@ -534,7 +534,7 @@ export default function Scanner() {
                   display: 'inline-block'
                 }} />
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  {modelLoaded ? 'Online • Llama GGUF Model' : 'Offline • Model yuklanmagan'}
+                  {modelLoaded ? 'Online' : 'Offline'}
                 </span>
               </div>
             </div>

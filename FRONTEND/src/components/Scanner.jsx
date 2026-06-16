@@ -351,7 +351,7 @@ export default function Scanner() {
       {/* Title Header */}
       <div style={{ textAlign: 'center', marginBottom: 4 }}>
         <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 2 }}>
-          NEXURA <span style={{ color: 'var(--primary)' }}>Workspace</span>
+          NEXURA
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
           AI Kiberxavfsizlik yordamchisi va interaktiv terminal muhiti

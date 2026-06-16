@@ -16,6 +16,21 @@
   --radius: 8px;
 }
 
+[data-theme="light"] {
+  --primary: #1a7ad4;
+  --primary-dark: #0e5ca8;
+  --bg: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-input: #e2e8f0;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --border: #cbd5e1;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --critical: #9333ea;
+}
+
 * {
   margin: 0;
   padding: 0;

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { ScannerProvider } from './ScannerContext'
+import { ThemeProvider } from './contexts/ThemeContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import Sidebar from './components/Sidebar'
 import Scanner from './components/Scanner'
@@ -20,6 +21,7 @@ export default function App() {
 
   return (
     <AccessKeyGate>
+      <ThemeProvider>
       <ScannerProvider>
         <ErrorBoundary>
           <Sidebar page={page} onNavigate={(p) => { setPage(p); setMenuOpen(false) }} menuOpen={menuOpen} onToggle={() => setMenuOpen(!menuOpen)} />
@@ -43,6 +45,7 @@ export default function App() {
           </div>
         </ErrorBoundary>
       </ScannerProvider>
+      </ThemeProvider>
     </AccessKeyGate>
   )
 }

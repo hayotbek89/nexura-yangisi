@@ -49,9 +49,12 @@ TOOL_PATHS = {
 }
 
 def is_tool_available(tool_name: str) -> bool:
+    which = shutil.which(tool_name)
+    if which is not None:
+        return True
     if tool_name in TOOL_PATHS:
         return os.path.isfile(TOOL_PATHS[tool_name])
-    return shutil.which(tool_name) is not None
+    return False
 
 def get_env():
     env = os.environ.copy()

@@ -1,5 +1,6 @@
 import React from 'react'
 import styled from 'styled-components'
+import ThemeToggle from './ThemeToggle'
 
 const NavButton = styled.button`
   position: relative;
@@ -132,7 +133,10 @@ export default function Sidebar({ page, onNavigate, menuOpen, onToggle }) {
             </NavButton>
           ))}
         </nav>
-        <div style={{ padding: '0 12px', marginTop: 'auto' }}>
+        <div style={{ padding: '0 12px', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <ThemeToggle />
+          </div>
           <button onClick={() => {
             localStorage.removeItem('nexura_auth');
             window.location.reload();

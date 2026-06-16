@@ -79,10 +79,10 @@ const NavButton = styled.button`
 `
 
 const pages = [
-  { id: 'scanner', label: 'Scanner', icon: '⚡' },
-  { id: 'history', label: 'Tarix', icon: '📋' },
-  { id: 'reports', label: 'Hisobotlar', icon: '📊' },
-  { id: 'settings', label: 'Sozlamalar', icon: '⚙️' },
+  { id: 'scanner', label: 'Scanner', icon: '' },
+  { id: 'history', label: 'Tarix', icon: '' },
+  { id: 'reports', label: 'Hisobotlar', icon: '' },
+  { id: 'settings', label: 'Sozlamalar', icon: '' },
 ]
 
 export default function Sidebar({ page, onNavigate, menuOpen, onToggle }) {

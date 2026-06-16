@@ -386,7 +386,6 @@ export default function Scanner() {
             alignItems: 'center',
             gap: 10,
           }}>
-            <span style={{ fontSize: 20 }}>🤖</span>
             <div>
               <div style={{ fontWeight: 700, fontSize: 14 }}>NEXURA AI Assistant</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>

@@ -112,6 +112,143 @@ const StyledWrapper = styled.div`
   }
 `;
 
+const TerminalBox = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  font-family: Menlo, Consolas, monospace;
+  font-size: 14px;
+  color: #e6e6e6;
+  border-radius: 5px;
+  overflow: hidden;
+`
+
+const TerminalToolbar = styled.div`
+  display: flex;
+  height: 30px;
+  align-items: center;
+  padding: 0 8px;
+  background: #212121;
+  justify-content: space-between;
+`
+
+const Buttons = styled.div`
+  display: flex;
+  align-items: center;
+`
+
+const Dot = styled.button`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  margin-right: 5px;
+  font-size: 8px;
+  height: 12px;
+  width: 12px;
+  border: none;
+  border-radius: 100%;
+  background: ${p => p.$color || 'linear-gradient(#7d7871 0%, #595953 100%)'};
+  cursor: pointer;
+`
+
+const TabUser = styled.p`
+  color: #d5d0ce;
+  margin-left: 6px;
+  font-size: 14px;
+  line-height: 15px;
+`
+
+const AddTab = styled.div`
+  border: 1px solid #fff;
+  color: #fff;
+  padding: 0 6px;
+  border-radius: 4px 4px 0 0;
+  border-bottom: none;
+  cursor: pointer;
+`
+
+const TerminalBody = styled.div`
+  background: rgba(0, 0, 0, 0.6);
+  flex: 1;
+  padding-top: 2px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+`
+
+const Prompt = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 4px;
+`
+
+const PromptSpan = styled.span`
+  margin-left: 4px;
+`
+
+const UserSpan = styled(PromptSpan)`
+  color: #1eff8e;
+`
+
+const LocationSpan = styled(PromptSpan)`
+  color: #4878c0;
+`
+
+const BlingSpan = styled(PromptSpan)`
+  color: #ddd;
+`
+
+const Cursor = styled.span`
+  display: block;
+  height: 14px;
+  width: 5px;
+  margin-left: 10px;
+  animation: curbl 1200ms linear infinite;
+
+  @keyframes curbl {
+    0% { background: #fff; }
+    49% { background: #fff; }
+    60% { background: transparent; }
+    99% { background: transparent; }
+    100% { background: #fff; }
+  }
+`
+
+const OutputArea = styled.div`
+  padding: 4px;
+  flex: 1;
+  overflow-y: auto;
+  max-height: calc(100vh - 320px);
+`
+
+const OutputLine = styled.pre`
+  margin: 0;
+  color: ${p =>
+    p.$log?.startsWith('nexura@scanner') ? '#38bdf8' :
+    p.$log?.startsWith('[ERROR]') || p.$log?.startsWith('[FAIL]') ? '#ef4444' :
+    p.$log?.startsWith('[STDERR]') ? '#f59e0b' : '#e6e6e6'};
+`
+
+const InputRow = styled.div`
+  padding: 4px;
+`
+
+const TerminalInput2 = styled.input`
+  width: 100%;
+  padding: 6px;
+  background: transparent;
+  border: none;
+  color: #e6e6e6;
+  caret-color: #1eff8e;
+  outline: none;
+  font-family: Menlo, Consolas, monospace;
+  font-size: 12px;
+
+  &::placeholder { color: rgba(255,255,255,0.2); }
+`
+
 // Simple helper to format basic markdown (bold, lists, code blocks) safely into HTML
 function renderMarkdown(text) {
   if (!text) return ''
@@ -588,116 +725,49 @@ export default function Scanner() {
           </form>
         </div>
 
-        {/* RIGHT COLUMN: Interactive Secure Web Terminal */}
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          background: 'var(--terminal-bg, #020617)',
-          borderRadius: 'var(--radius)',
-          border: '1px solid var(--border)',
-          overflow: 'hidden',
-        }}>
-          {/* Terminal Header */}
-          <div style={{
-            background: 'var(--terminal-header, #0f172a)',
-            padding: '10px 16px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
-              <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#eab308', display: 'inline-block' }} />
-              <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-            </div>
-            <span style={{
-              marginLeft: 'auto',
-              marginRight: 'auto',
-              fontSize: 13,
-              fontFamily: 'monospace',
-              color: 'var(--text-muted)',
-              fontWeight: 600
-            }}>
-              interactive-secure-shell (powershell-bypass-neutralized)
-            </span>
-          </div>
-
-          {/* Terminal Console View */}
-          <div className="terminal-console" style={{
-            flex: 1,
-            padding: 16,
-            overflowY: 'auto',
-            background: 'var(--terminal-bg, #020617)',
-            color: 'var(--terminal-text, #10b981)',
-            fontFamily: 'monospace',
-            fontSize: 13,
-            lineHeight: '1.6',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-            maxHeight: 'calc(100vh - 300px)',
-          }}>
-            {terminalLogs.map((log, idx) => (
-              <div key={idx} style={{
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-all',
-                color: log.startsWith('nexura@scanner') ? 'var(--terminal-prompt, #38bdf8)' :
-                       log.startsWith('[ERROR]') || log.startsWith('[FAIL]') ? 'var(--danger)' :
-                       log.startsWith('[STDERR]') ? 'var(--warning)' : 'var(--terminal-text, #10b981)'
-              }}>
-                {log}
-              </div>
-            ))}
-
-            {terminalLoading && (
-              <div style={{ color: 'var(--warning)', display: 'flex', gap: 6, alignItems: 'center' }}>
-                <span className="dot" style={{ width: 6, height: 6, background: 'var(--warning)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both' }} />
-                <span>Buyruq bajarilmoqda, kuting...</span>
-              </div>
-            )}
-            <div ref={terminalEndRef} />
-          </div>
-
-          {/* Terminal Command Input */}
-          <form onSubmit={handleTerminalSubmit} style={{
-            display: 'flex',
-            alignItems: 'center',
-            background: 'var(--terminal-input-bg, #090d16)',
-            padding: '12px 16px',
-            borderTop: '1px solid var(--border)',
-          }}>
-            <span style={{
-              fontFamily: 'monospace',
-              color: 'var(--terminal-prompt, #38bdf8)',
-              fontSize: 13,
-              marginRight: 8,
-              userSelect: 'none',
-              fontWeight: 700
-            }}>
-              nexura@scanner:~$
-            </span>
-            <input
-              value={terminalInput}
-              onChange={e => setTerminalInput(e.target.value)}
-              placeholder="nmap -F target.com"
-              disabled={terminalLoading}
-              style={{
-                flex: 1,
-                background: 'transparent',
-                border: 'none',
-                outline: 'none',
-                color: 'var(--terminal-text, #10b981)',
-                fontFamily: 'monospace',
-                fontSize: 13,
-                caretColor: 'var(--terminal-text, #10b981)',
-                width: '100%',
-              }}
-              autoFocus
-            />
-          </form>
-        </div>
+        {/* RIGHT COLUMN: Terminal */}
+        <TerminalBox>
+          <TerminalToolbar>
+            <Buttons>
+              <Dot $color="#ee411a" />
+              <Dot />
+              <Dot />
+            </Buttons>
+            <TabUser>00Kubi@admin: ~</TabUser>
+            <AddTab>+</AddTab>
+          </TerminalToolbar>
+          <TerminalBody>
+            <Prompt>
+              <UserSpan>00Kubi@admin:</UserSpan>
+              <LocationSpan>~</LocationSpan>
+              <BlingSpan>$</BlingSpan>
+              <Cursor />
+            </Prompt>
+            <OutputArea>
+              {terminalLogs.length === 0 && !terminalLoading && (
+                <OutputLine $log="">Welcome to NEXURA Security Terminal</OutputLine>
+              )}
+              {terminalLogs.map((log, idx) => (
+                <OutputLine key={idx} $log={log}>{log}</OutputLine>
+              ))}
+              {terminalLoading && (
+                <OutputLine $log="">Buyruq bajarilmoqda, kuting...</OutputLine>
+              )}
+              <div ref={terminalEndRef} />
+            </OutputArea>
+            <InputRow>
+              <form onSubmit={handleTerminalSubmit}>
+                <TerminalInput2
+                  value={terminalInput}
+                  onChange={e => setTerminalInput(e.target.value)}
+                  placeholder="nmap -F target.com"
+                  disabled={terminalLoading}
+                  autoFocus
+                />
+              </form>
+            </InputRow>
+          </TerminalBody>
+        </TerminalBox>
       </div>
     </div>
   )

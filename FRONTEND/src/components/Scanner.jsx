@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useScanner } from '../ScannerContext'
+import { useWindowSize } from '../hooks/useWindowSize'
 import styled from 'styled-components'
 
 const StyledWrapper = styled.div`
@@ -281,6 +282,7 @@ function renderMarkdown(text) {
 
 export default function Scanner() {
   const { scanning, setScanning, setFindings, setReportUrl, setScanId } = useScanner()
+  const winWidth = useWindowSize()
   
   // AI Chat States
   const [chatInput, setChatInput] = useState('')
@@ -498,7 +500,7 @@ export default function Scanner() {
       {/* Main Split Grid */}
       <div style={{
         display: 'flex',
-        flexDirection: window.innerWidth < 1024 ? 'column' : 'row',
+        flexDirection: winWidth < 1024 ? 'column' : 'row',
         gap: 20,
         flex: 1,
         minHeight: 'calc(100vh - 150px)',

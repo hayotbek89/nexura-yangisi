@@ -1,6 +1,7 @@
 import React from 'react'
 import styled from 'styled-components'
 import ThemeToggle from './ThemeToggle'
+import { useWindowSize } from '../hooks/useWindowSize'
 
 const NavButton = styled.button`
   position: relative;
@@ -86,7 +87,8 @@ const pages = [
 ]
 
 export default function Sidebar({ page, onNavigate, menuOpen, onToggle }) {
-  const isMobile = window.innerWidth < 768
+  const winWidth = useWindowSize()
+  const isMobile = winWidth < 768
 
   const sidebarStyle = {
     width: 220,

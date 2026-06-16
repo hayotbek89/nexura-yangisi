@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { ScannerProvider } from './ScannerContext'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { useWindowSize } from './hooks/useWindowSize'
 import ErrorBoundary from './components/ErrorBoundary'
 import Sidebar from './components/Sidebar'
 import Scanner from './components/Scanner'
@@ -14,6 +15,8 @@ import './App.css'
 export default function App() {
   const [page, setPage] = useState('scanner')
   const [menuOpen, setMenuOpen] = useState(false)
+  const winWidth = useWindowSize()
+  const isMobile = winWidth < 768
 
   const handleLogout = () => {
     localStorage.removeItem('nexura_auth');
@@ -29,9 +32,9 @@ export default function App() {
           <Sidebar page={page} onNavigate={(p) => { setPage(p); setMenuOpen(false) }} menuOpen={menuOpen} onToggle={() => setMenuOpen(!menuOpen)} />
           <div style={{
             flex: 1, padding: '24px', overflow: 'auto',
-            marginLeft: window.innerWidth < 768 ? 0 : undefined,
+            marginLeft: isMobile ? 0 : undefined,
           }}>
-            <div style={{ display: window.innerWidth < 768 ? 'block' : 'none', marginBottom: 16 }}>
+            <div style={{ display: isMobile ? 'block' : 'none', marginBottom: 16 }}>
               <button onClick={() => setMenuOpen(!menuOpen)}
                 style={{
                   padding: '8px 16px', borderRadius: 'var(--radius)', border: '1px solid var(--border)',

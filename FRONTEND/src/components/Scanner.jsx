@@ -1,5 +1,115 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useScanner } from '../ScannerContext'
+import styled from 'styled-components'
+
+const StyledWrapper = styled.div`
+  .pb-ai-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px;
+    border-radius: 999px;
+    background: linear-gradient(
+      180deg,
+      rgba(166, 125, 255, 0.18) 0%,
+      rgba(122, 69, 255, 0.12) 100%
+    );
+    backdrop-filter: blur(14px);
+    box-shadow:
+      0 0 0 4px rgba(125, 71, 255, 0.08),
+      0 0 24px rgba(98, 43, 255, 0.14),
+      inset 0 0 6px rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .pb-ai-input-wrap::before {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border-radius: inherit;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.16),
+      rgba(255, 255, 255, 0.04) 45%,
+      rgba(255, 255, 255, 0)
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
+  .pb-ai-input-wrap::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background-image: radial-gradient(
+        circle at bottom center,
+        rgba(255, 255, 255, 0.18) 0%,
+        rgba(255, 255, 255, 0.06) 20%,
+        transparent 60%
+      ),
+      radial-gradient(rgba(255, 255, 255, 0.1) 0.8px, transparent 0.8px);
+    background-size: 100% 100%, 5px 5px;
+    opacity: 0.35;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .pb-ai-input {
+    position: relative;
+    z-index: 3;
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    padding: 0 8px;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: -0.15px;
+  }
+  .pb-ai-input::placeholder {
+    color: rgba(255, 255, 255, 0.55);
+  }
+  .pb-ai-input-btn {
+    position: relative;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 10px 14px;
+    border-radius: 999px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: -0.15px;
+    background: linear-gradient(180deg, #a67dff 0%, #7a45ff 45%, #5d24ff 100%);
+    box-shadow:
+      0 0 0 3px rgba(125, 71, 255, 0.1),
+      0 5px 12px rgba(98, 43, 255, 0.2),
+      inset 0 2px 8px rgba(255, 255, 255, 0.16);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .pb-ai-input-btn:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 4px rgba(125, 71, 255, 0.12),
+      0 8px 16px rgba(98, 43, 255, 0.24),
+      inset 0 2px 8px rgba(255, 255, 255, 0.2);
+  }
+  .pb-ai-input-btn:active {
+    transform: scale(0.97);
+  }
+  .pb-ai-sparkle {
+    font-size: 12px;
+    transform: translateY(-1px);
+  }
+`;
 
 // Simple helper to format basic markdown (bold, lists, code blocks) safely into HTML
 function renderMarkdown(text) {
@@ -458,42 +568,23 @@ export default function Scanner() {
             padding: 12,
             borderTop: '1px solid var(--border)',
             background: 'var(--bg-card)',
-            display: 'flex',
-            gap: 8,
           }}>
-            <input
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              placeholder="Buyruq yozing..."
-              disabled={chatLoading}
-              style={{
-                flex: 1,
-                padding: '12px 16px',
-                borderRadius: 'var(--radius)',
-                border: '1px solid var(--border)',
-                background: 'var(--bg-input)',
-                color: 'var(--text)',
-                fontSize: 14,
-                outline: 'none',
-              }}
-            />
-            <button
-              type="submit"
-              disabled={chatLoading || !chatInput.trim()}
-              style={{
-                padding: '12px 24px',
-                borderRadius: 'var(--radius)',
-                border: 'none',
-                background: chatInput.trim() ? 'var(--primary)' : 'var(--bg-input)',
-                color: '#fff',
-                fontWeight: 700,
-                fontSize: 14,
-                cursor: chatInput.trim() ? 'pointer' : 'default',
-                opacity: chatInput.trim() && !chatLoading ? 1 : 0.6,
-              }}
-            >
-              Yuborish
-            </button>
+            <StyledWrapper>
+              <div className="pb-ai-input-wrap">
+                <input
+                  type="text"
+                  className="pb-ai-input"
+                  placeholder="Buyruq yozing..."
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  disabled={chatLoading}
+                />
+                <button className="pb-ai-input-btn" type="submit" disabled={chatLoading || !chatInput.trim()}>
+                  <span>Yuborish</span>
+                  <span className="pb-ai-sparkle">✦</span>
+                </button>
+              </div>
+            </StyledWrapper>
           </form>
         </div>
 

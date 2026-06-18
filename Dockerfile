@@ -35,15 +35,15 @@ RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-RUN wget -q https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_linux_amd64.zip \
-    && unzip -q nuclei_linux_amd64.zip -d /tmp/nuclei \
+RUN curl -fL https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_linux_amd64.zip -o /tmp/nuclei.zip \
+    && unzip -q /tmp/nuclei.zip -d /tmp/nuclei \
     && mv /tmp/nuclei/nuclei /usr/local/bin/nuclei \
-    && rm -rf nuclei_linux_amd64.zip /tmp/nuclei
+    && rm -rf /tmp/nuclei.zip /tmp/nuclei
 
-RUN wget -q https://github.com/OJ/gobuster/releases/latest/download/gobuster_linux_amd64.tar.gz \
-    && tar -xzf gobuster_linux_amd64.tar.gz -C /tmp/gobuster \
+RUN curl -fL https://github.com/OJ/gobuster/releases/latest/download/gobuster_linux_amd64.tar.gz -o /tmp/gobuster.tar.gz \
+    && tar -xzf /tmp/gobuster.tar.gz -C /tmp/gobuster \
     && mv /tmp/gobuster/gobuster /usr/local/bin/gobuster \
-    && rm -rf gobuster_linux_amd64.tar.gz /tmp/gobuster
+    && rm -rf /tmp/gobuster.tar.gz /tmp/gobuster
 
 RUN git clone --depth 1 https://github.com/sullo/nikto /opt/nikto \
     && ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto
@@ -51,7 +51,7 @@ RUN git clone --depth 1 https://github.com/sullo/nikto /opt/nikto \
 RUN git clone --depth 1 https://github.com/sqlmapproject/sqlmap /opt/sqlmap \
     && ln -s /opt/sqlmap/sqlmap.py /usr/local/bin/sqlmap
 
-RUN gem install whatweb
+RUN gem install whatweb --no-document
 
 COPY --from=python-deps /usr/local /usr/local
 

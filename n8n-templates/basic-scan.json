@@ -1,0 +1,58 @@
+{
+  "name": "Nexura - Asosiy skanerlash",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "nexura-scan",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nexura-scan",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.NEXURA_API_URL }}/api/webhook/scan",
+        "authentication": "genericCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.NEXURA_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "prompt",
+              "value": "={{ $json.body.prompt }}"
+            },
+            {
+              "name": "target",
+              "value": "={{ $json.body.target }}"
+            }
+          ]
+        }
+      },
+      "id": "http",
+      "name": "Nexura API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [500, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Nexura API", "type": "main", "index": 0 }]]
+    }
+  }
+}

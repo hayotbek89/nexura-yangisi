@@ -1,0 +1,132 @@
+{
+  "name": "Nexura - Async scan + natijani kutish",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nexura-async",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "nexura-async"
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.NEXURA_API_URL }}/api/webhook/scan/async",
+        "authentication": "genericCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Key", "value": "={{ $env.NEXURA_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "prompt", "value": "={{ $json.body.prompt }}" },
+            { "name": "target", "value": "={{ $json.body.target }}" }
+          ]
+        }
+      },
+      "id": "start-scan",
+      "name": "Skanerlni boshlash",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.NEXURA_API_URL }}/api/webhook/scan/{{ $json.job_id }}/results",
+        "authentication": "genericCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Key", "value": "={{ $env.NEXURA_API_KEY }}" }
+          ]
+        },
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "poll-results",
+      "name": "Natijani olish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "equal",
+              "value2": "running"
+            }
+          ]
+        }
+      },
+      "id": "check-status",
+      "name": "Tayyormi?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [950, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.NEXURA_API_URL }}/api/webhook/scan/{{ $('Skanerlni boshlash').item.json.job_id }}/results",
+        "authentication": "genericCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Key", "value": "={{ $env.NEXURA_API_KEY }}" }
+          ]
+        },
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "wait-and-retry",
+      "name": "Kutish va qayta tekshirish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1150, 200]
+    },
+    {
+      "parameters": {
+        "subject": "Nexura skanerlash natijalari",
+        "text": "Target: {{ $json.target }}\nZaifliklar: {{ $json.total_vulnerabilities }}\nOchiq portlar: {{ $json.total_ports }}"
+      },
+      "id": "email",
+      "name": "Natijani yuborish",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [1150, 400]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Skanerlni boshlash", "type": "main", "index": 0 }]]
+    },
+    "Skanerlni boshlash": {
+      "main": [[{ "node": "Natijani olish", "type": "main", "index": 0 }]]
+    },
+    "Natijani olish": {
+      "main": [[{ "node": "Tayyormi?", "type": "main", "index": 0 }]]
+    },
+    "Tayyormi?": {
+      "main": [
+        [{ "node": "Kutish va qayta tekshirish", "type": "main", "index": 0 }],
+        [{ "node": "Natijani yuborish", "type": "main", "index": 0 }]
+      ]
+    },
+    "Kutish va qayta tekshirish": {
+      "main": [[{ "node": "Natijani olish", "type": "main", "index": 0 }]]
+    }
+  }
+}

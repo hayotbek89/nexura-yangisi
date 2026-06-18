@@ -611,6 +611,168 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
     }
 
 
+# ---- n8n Webhook API ----
+import uuid
+
+_scan_jobs: dict[str, dict] = {}
+
+class WebhookScanRequest(BaseModel):
+    prompt: str = Field(max_length=2000)
+    target: str | None = Field(default=None, max_length=500)
+    agentic: bool = False
+
+@app.post("/api/webhook/scan")
+async def webhook_scan(req: WebhookScanRequest, request: Request, _=Depends(_verify_token)):
+    state = request.app.state
+    selector = _get_selector(request)
+    if not selector:
+        engine = state.engine
+        if not engine.is_ready:
+            return JSONResponse(status_code=503, content={"error": "AI Engine yoqilmagan"})
+        selector = ToolSelector(engine)
+        state.selector = selector
+
+    plan = await selector.create_plan_async(req.prompt, req.target)
+    if plan.target in (None, "unknown", ""):
+        return JSONResponse(status_code=400, content={"error": "Target aniqlanmadi"})
+    if not plan.tools:
+        return JSONResponse(status_code=400, content={"error": f"Skanerlash rejasi tuzilmadi: {plan.reasoning}"})
+
+    report = state.reporter.create_report(plan.target, plan.intent)
+    for tc in plan.tools:
+        result = await state.runner.run_async(tc, plan.target)
+        report.results.append(result)
+
+    report.end_time = datetime.now()
+    report.status = "completed"
+
+    try:
+        tech_url = plan.target if "://" in plan.target else f"https://{plan.target}"
+        report.technologies = state.scanner.detect_technologies(tech_url)
+    except Exception:
+        pass
+
+    html_path = state.reporter.save(report, fmt="both")
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, state.history_db.save_session, report, report.technologies)
+
+    return {
+        "job_id": report.id,
+        "target": report.target,
+        "status": "completed",
+        "tools": [t.tool.value for t in plan.tools],
+        "total_ports": sum(len(r.ports) for r in report.results),
+        "total_vulnerabilities": sum(len(r.vulnerabilities) for r in report.results),
+        "vulnerabilities": [
+            {
+                "tool": r.tool,
+                "name": v.name,
+                "severity": v.severity,
+                "port": v.port,
+                "cve": v.cve,
+                "cvss": v.cvss,
+            }
+            for r in report.results for v in r.vulnerabilities
+        ],
+        "report_url": f"/reports/{Path(html_path).name}" if html_path else None,
+        "technologies": report.technologies,
+    }
+
+
+@app.post("/api/webhook/scan/async")
+async def webhook_scan_async(req: WebhookScanRequest, request: Request, _=Depends(_verify_token)):
+    state = request.app.state
+    selector = _get_selector(request)
+    if not selector:
+        engine = state.engine
+        if not engine.is_ready:
+            return JSONResponse(status_code=503, content={"error": "AI Engine yoqilmagan"})
+        selector = ToolSelector(engine)
+        state.selector = selector
+
+    plan = await selector.create_plan_async(req.prompt, req.target)
+    if plan.target in (None, "unknown", ""):
+        return JSONResponse(status_code=400, content={"error": "Target aniqlanmadi"})
+    if not plan.tools:
+        return JSONResponse(status_code=400, content={"error": f"Skanerlash rejasi tuzilmadi: {plan.reasoning}"})
+
+    job_id = str(uuid.uuid4())[:8]
+    _scan_jobs[job_id] = {
+        "status": "running",
+        "target": plan.target,
+        "intent": plan.intent,
+        "tools": [t.tool.value for t in plan.tools],
+        "start_time": datetime.now().isoformat(),
+        "results": None,
+        "error": None,
+    }
+
+    async def run_job():
+        try:
+            report = state.reporter.create_report(plan.target, plan.intent)
+            for tc in plan.tools:
+                result = await state.runner.run_async(tc, plan.target)
+                report.results.append(result)
+            report.end_time = datetime.now()
+            report.status = "completed"
+
+            try:
+                tech_url = plan.target if "://" in plan.target else f"https://{plan.target}"
+                report.technologies = state.scanner.detect_technologies(tech_url)
+            except Exception:
+                pass
+
+            html_path = state.reporter.save(report, fmt="both")
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, state.history_db.save_session, report, report.technologies)
+
+            _scan_jobs[job_id].update({
+                "status": "completed",
+                "results": {
+                    "total_ports": sum(len(r.ports) for r in report.results),
+                    "total_vulnerabilities": sum(len(r.vulnerabilities) for r in report.results),
+                    "vulnerabilities": [
+                        {"tool": r.tool, "name": v.name, "severity": v.severity, "port": v.port, "cve": v.cve, "cvss": v.cvss}
+                        for r in report.results for v in r.vulnerabilities
+                    ],
+                    "report_url": f"/reports/{Path(html_path).name}" if html_path else None,
+                    "technologies": report.technologies,
+                },
+            })
+        except Exception as e:
+            _scan_jobs[job_id].update({"status": "failed", "error": str(e)})
+
+    asyncio.create_task(run_job())
+
+    return {"job_id": job_id, "status": "running", "target": plan.target, "tools": [t.tool.value for t in plan.tools]}
+
+
+@app.get("/api/webhook/scan/{job_id}/status")
+async def webhook_scan_status(job_id: str, _=Depends(_verify_token)):
+    job = _scan_jobs.get(job_id)
+    if not job:
+        return JSONResponse(status_code=404, content={"error": "Job topilmadi"})
+    return {
+        "job_id": job_id,
+        "status": job["status"],
+        "target": job.get("target"),
+        "start_time": job.get("start_time"),
+        "tools": job.get("tools"),
+    }
+
+
+@app.get("/api/webhook/scan/{job_id}/results")
+async def webhook_scan_results(job_id: str, _=Depends(_verify_token)):
+    job = _scan_jobs.get(job_id)
+    if not job:
+        return JSONResponse(status_code=404, content={"error": "Job topilmadi"})
+    if job["status"] == "running":
+        return JSONResponse(status_code=202, content={"status": "running", "message": "Skanerlash davom etmoqda"})
+    if job["status"] == "failed":
+        return {"job_id": job_id, "status": "failed", "error": job["error"]}
+    return {"job_id": job_id, "status": "completed", **job["results"]}
+
+
 ALLOWED_TERMINAL_COMMANDS = frozenset({
     "nmap", "nuclei", "nikto", "sqlmap", "gobuster", "amass", "whatweb",
     "ping", "nslookup", "dig", "traceroute", "tracert", "ls", "dir", "pwd"

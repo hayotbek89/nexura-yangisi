@@ -33,16 +33,17 @@ services:
     container_name: nexura-n8n
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5678:5678"
+      - "5678:5678"
     volumes:
       - n8n_data:/home/node/.n8n
     environment:
       - N8N_PORT=5678
-      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_HOST=${N8N_HOST:-185.191.141.247}
       - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
       - N8N_SECURE_COOKIE=false
       - NEXURA_API_URL=http://nexura:8080
       - NEXURA_API_KEY=${NEXURA_API_KEY:-}
+      - WEBHOOK_URL=http://185.191.141.247:5678/
     env_file:
       - .env
     depends_on:

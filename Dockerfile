@@ -52,7 +52,8 @@ RUN git clone --depth 1 https://github.com/sullo/nikto /opt/nikto \
 RUN git clone --depth 1 https://github.com/sqlmapproject/sqlmap /opt/sqlmap \
     && ln -s /opt/sqlmap/sqlmap.py /usr/local/bin/sqlmap
 
-RUN gem install whatweb --no-document
+RUN git clone --depth 1 https://github.com/urbanadventurer/WhatWeb /opt/whatweb \
+    && ln -s /opt/whatweb/whatweb /usr/local/bin/whatweb
 
 COPY --from=python-deps /usr/local /usr/local
 

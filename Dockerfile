@@ -40,8 +40,7 @@ RUN curl -fL https://github.com/projectdiscovery/nuclei/releases/download/v3.9.0
     && mv /tmp/nuclei/nuclei /usr/local/bin/nuclei \
     && rm -rf /tmp/nuclei.zip /tmp/nuclei
 
-RUN GOBUSTER_VER=$(curl -sL https://api.github.com/repos/OJ/gobuster/releases/latest | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])") \
-    && curl -fL "https://github.com/OJ/gobuster/releases/download/${GOBUSTER_VER}/gobuster_linux_amd64.tar.gz" -o /tmp/gobuster.tar.gz \
+RUN curl -fL https://github.com/OJ/gobuster/releases/download/v3.8.2/gobuster_Linux_x86_64.tar.gz -o /tmp/gobuster.tar.gz \
     && tar -xzf /tmp/gobuster.tar.gz -C /tmp/gobuster \
     && mv /tmp/gobuster/gobuster /usr/local/bin/gobuster \
     && rm -rf /tmp/gobuster.tar.gz /tmp/gobuster

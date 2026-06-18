@@ -130,6 +130,8 @@ if _API_KEY:
 
 def _verify_token(request: Request):
     if not _API_KEY:
+        if _IS_PRODUCTION:
+            raise HTTPException(status_code=503, detail="Production rejimda NEXURA_API_KEY majburiy.")
         return True
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer ") and auth[7:] == _API_KEY:
@@ -196,6 +198,29 @@ def _get_selector(request: Request) -> ToolSelector | None:
     return request.app.state.selector
 
 
+async def _enrich_report_with_cms_cves(state, report, target: str) -> None:
+    if not report.technologies or not report.technologies.get("cms"):
+        return
+    cms = report.technologies["cms"]
+    try:
+        cve_results = await state.cve_lookup.lookup_by_service(cms, "")
+        if not report.results:
+            report.results.append(
+                ScanResult(tool="cve", target=target, start_time=datetime.now(), success=True)
+            )
+        for cv in cve_results:
+            if not any(v.cve == cv.cve_id for r in report.results for v in r.vulnerabilities):
+                report.results[0].vulnerabilities.append(Vulnerability(
+                    name=f"CVE: {cv.cve_id} — {cv.description[:100]}",
+                    severity=cv.severity,
+                    cve=cv.cve_id,
+                    cvss=cv.cvss_score,
+                    url=cv.url,
+                ))
+    except Exception as e:
+        logger.warning("CVE enrichment failed for %s: %s", cms, e, exc_info=True)
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
     html_path = FRONTEND_DIST / "index.html"
@@ -238,28 +263,11 @@ async def start_scan(req: ScanRequest, request: Request, _=Depends(_verify_token
     except Exception as e:
         logger.warning("Technology detection failed for %s: %s", plan.target, e, exc_info=True)
 
+    await _enrich_report_with_cms_cves(state, report, plan.target)
+
     html_path = state.reporter.save(report, fmt="both")
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, state.history_db.save_session, report, report.technologies)
-
-    if report.technologies and report.technologies.get("cms"):
-        try:
-            cve_results = await state.cve_lookup.lookup_by_service(report.technologies["cms"], "")
-            if not report.results:
-                report.results.append(
-                    ScanResult(tool="cve", target=plan.target, start_time=datetime.now(), success=True)
-                )
-            for cv in cve_results:
-                if not any(v.cve == cv.cve_id for r in report.results for v in r.vulnerabilities):
-                    report.results[0].vulnerabilities.append(Vulnerability(
-                        name=f"CVE: {cv.cve_id} — {cv.description[:100]}",
-                        severity=cv.severity,
-                        cve=cv.cve_id,
-                        cvss=cv.cvss_score,
-                        url=cv.url,
-                    ))
-        except Exception as e:
-            logger.warning("CVE enrichment failed for %s: %s", report.technologies["cms"], e, exc_info=True)
 
     relative_report_html = f"/reports/{Path(html_path).name}" if html_path else None
     return {
@@ -531,28 +539,11 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
     except Exception as e:
         logger.warning("Technology detection failed for %s: %s", plan.target, e, exc_info=True)
 
+    await _enrich_report_with_cms_cves(state, report, plan.target)
+
     html_path = state.reporter.save(report, fmt="both")
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, state.history_db.save_session, report, report.technologies)
-
-    if report.technologies and report.technologies.get("cms"):
-        try:
-            cve_results = await state.cve_lookup.lookup_by_service(report.technologies["cms"], "")
-            if not report.results:
-                report.results.append(
-                    ScanResult(tool="cve", target=plan.target, start_time=datetime.now(), success=True)
-                )
-            for cv in cve_results:
-                if not any(v.cve == cv.cve_id for r in report.results for v in r.vulnerabilities):
-                    report.results[0].vulnerabilities.append(Vulnerability(
-                        name=f"CVE: {cv.cve_id} — {cv.description[:100]}",
-                        severity=cv.severity,
-                        cve=cv.cve_id,
-                        cvss=cv.cvss_score,
-                        url=cv.url,
-                    ))
-        except Exception as e:
-            logger.warning("CVE enrichment failed for %s: %s", report.technologies["cms"], e, exc_info=True)
 
     relative_report_html = f"/reports/{Path(html_path).name}" if html_path else None
 

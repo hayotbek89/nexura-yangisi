@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useScanner } from '../ScannerContext'
 import { useWindowSize } from '../hooks/useWindowSize'
+import { apiFetch } from '../api'
 import styled from 'styled-components'
 
 const StyledWrapper = styled.div`
@@ -281,23 +282,17 @@ function renderMarkdown(text) {
 }
 
 export default function Scanner() {
-  const { scanning, setScanning, setFindings, setReportUrl, setScanId } = useScanner()
+  const { scanning, setScanning, setFindings, setReportUrl, setScanId,
+    chatLogs, setChatLogs, chatLoading, setChatLoading,
+    terminalLogs, setTerminalLogs, terminalLoading, setTerminalLoading } = useScanner()
   const winWidth = useWindowSize()
   
   // AI Chat States
   const [chatInput, setChatInput] = useState('')
-  const [chatLogs, setChatLogs] = useState([])
-  const [chatLoading, setChatLoading] = useState(false)
   const [modelLoaded, setModelLoaded] = useState(null)
   
   // Terminal States
   const [terminalInput, setTerminalInput] = useState('')
-  const [terminalLogs, setTerminalLogs] = useState([
-    'NEXURA Secure Scanner Terminal v2.0.0',
-    'Ruxsat etilgan buyruqlar: nmap, nuclei, nikto, sqlmap, gobuster, amass, whatweb, ping, nslookup, dig, traceroute, ls, dir, pwd',
-    'Tizim tayyor. Buyruqni kiriting...'
-  ])
-  const [terminalLoading, setTerminalLoading] = useState(false)
 
   // Refs for auto-scroll
   const chatEndRef = useRef(null)
@@ -381,7 +376,7 @@ export default function Scanner() {
     }
 
     try {
-      const res = await fetch('/api/chat', {
+      const res = await apiFetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userMsg }),
@@ -452,7 +447,7 @@ export default function Scanner() {
     setTerminalLoading(true)
     
     try {
-      const res = await fetch('/api/terminal', {
+      const res = await apiFetch('/api/terminal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cmd }),

@@ -28,7 +28,18 @@ WORKDIR /app
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     nmap \
     curl \
+    wget \
+    unzip \
+    nikto \
+    sqlmap \
+    gobuster \
+    whatweb \
     && rm -rf /var/lib/apt/lists/*
+
+RUN wget -q https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_linux_amd64.zip \
+    && unzip -q nuclei_linux_amd64.zip -d /tmp/nuclei \
+    && mv /tmp/nuclei/nuclei /usr/local/bin/nuclei \
+    && rm -rf nuclei_linux_amd64.zip /tmp/nuclei
 
 COPY --from=python-deps /usr/local /usr/local
 
@@ -48,7 +59,7 @@ ENV PYTHONPATH=/app/BACKEND
 
 EXPOSE 8080
 
-VOLUME ["/app/reports", "/app/LOCAL_AI_MODELS"]
+VOLUME ["/app/BACKEND/reports", "/app/LOCAL_AI_MODELS"]
 
 WORKDIR /app/BACKEND
 CMD ["uvicorn", "nexura.web.app:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "2", "--proxy-headers", "--forwarded-allow-ips", "*"]

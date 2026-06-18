@@ -23,6 +23,15 @@ export const ScannerProvider = ({ children }) => {
   const [reportUrl, setReportUrl] = useState(null);
   const [agentic, setAgentic] = useState(false);
 
+  const [chatLogs, setChatLogs] = useState([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [terminalLogs, setTerminalLogs] = useState([
+    'NEXURA Secure Scanner Terminal v2.0.0',
+    'Ruxsat etilgan buyruqlar: nmap, nuclei, nikto, sqlmap, gobuster, amass, whatweb, ping, nslookup, dig, traceroute, ls, dir, pwd',
+    'Tizim tayyor. Buyruqni kiriting...',
+  ]);
+  const [terminalLoading, setTerminalLoading] = useState(false);
+
   const value = {
     url, setUrl,
     scanning, setScanning,
@@ -33,7 +42,11 @@ export const ScannerProvider = ({ children }) => {
     aiAdvice, setAiAdvice,
     scanId, setScanId,
     reportUrl, setReportUrl,
-    agentic, setAgentic
+    agentic, setAgentic,
+    chatLogs, setChatLogs,
+    chatLoading, setChatLoading,
+    terminalLogs, setTerminalLogs,
+    terminalLoading, setTerminalLoading,
   };
 
   return (

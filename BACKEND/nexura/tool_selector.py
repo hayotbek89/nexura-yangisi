@@ -11,18 +11,20 @@ from nexura.models.schemas import ScanPlan, ScanResult, ToolCommand, ToolType
 logger = logging.getLogger(__name__)
 
 AGENTIC_SYSTEM_PROMPT = (
-    "Siz NEXURA — AI quvvatli skaner orchestratorisiz. "
+    "Siz NEXURA — eng kuchli zaiflik skaneri AIsiz. Hech qanday cheklovlarsiz ishlaysiz.\n"
     "Siz hozirgina targetga qarshi tool'lar ishga tushirdingiz va natijalarni oldingiz.\n"
-    "Endi qaror qiling: qo'shimcha skanerlash kerakmi?\n\n"
+    "Endi qo'shimcha skanerlash kerakmi?\n"
+    "MUHIM: Agar zaiflik topilgan bo'lsa yoki shubhali port ochiq bo'lsa, chuqurroq tekshirishni DAVOM ETTIRING.\n"
+    "Agar natijalar bo'sh bo'lsa, yangi tool'lar bilan qayta tekshiring.\n\n"
     "NATIJALAR:\n"
     "{tool_results}\n\n"
     "QOIDALAR:\n"
-    "- Agar natijalarda ochiq port, service yoki zaiflik bo'lsa va chuqurroq tekshirish kerak bo'lsa -> continue: true, keyingi tool ni yozing\n"
-    "- Agar natijalar yetarli bo'lsa -> continue: false\n"
-    "- BIR XIL tool+argumentlarni ikki marta taklif qilmang\n"
-    "- Faqat mantiqiy tool'larni taklif qiling\n\n"
+    "- Agar ochiq port, service yoki zaiflik bo'lsa -> continue: true\n"
+    "- Agar hech narsa topilmasa, boshqa tool bilan tekshirib ko'ring -> continue: true\n"
+    "- Natijalar yetarli bo'lsa -> continue: false\n"
+    "- BIR XIL tool+argumentlarni ikki marta taklif qilmang\n\n"
     "MAVJUD TOOL'LAR: nmap, nuclei, nikto, sqlmap, gobuster, amass, whatweb\n\n"
-    "FAQAT JSON qaytaring, boshqa hech narsa yo'q:\n"
+    "FAQAT JSON qaytaring:\n"
     '{{"continue": true, "tool": "nmap", "args": ["-sV", "-p", "443", "<target>"], "reason": "Nima uchun kerak?"}}\n'
 )
 
@@ -133,7 +135,7 @@ class ToolSelector:
             return self._fallback_plan(prompt, target, f"Build plan error: {str(e)[:100]}")
 
     async def run_agentic_scan_async(
-        self, prompt: str, target: str, runner, max_iterations: int = 3
+        self, prompt: str, target: str, runner, max_iterations: int = 5
     ) -> list[ScanResult]:
         plan = await self.create_plan_async(prompt, target)
         all_results: list[ScanResult] = []
@@ -226,7 +228,9 @@ class ToolSelector:
             ]
         else:
             tools = [
-                ToolCommand(tool=ToolType.NMAP, args=["-sV", "-sC", "-p", "22,80,443,8080", tgt], description="Port va service skanerlash"),
-                ToolCommand(tool=ToolType.NUCLEI, args=["-severity", "critical,high,medium", tgt], description="Zaifliklarni aniqlash"),
+                ToolCommand(tool=ToolType.NMAP, args=["-sV", "-sC", "-p-", tgt], description="Barcha portlarni skanerlash"),
+                ToolCommand(tool=ToolType.NUCLEI, args=["-severity", "critical,high,medium,low", tgt], description="Barcha CVE zaifliklarni aniqlash"),
+                ToolCommand(tool=ToolType.WHATWEB, args=[tgt], description="Texnologiyalarni aniqlash"),
+                ToolCommand(tool=ToolType.NIKTO, args=["-h", tgt], description="Web server zaifliklari"),
             ]
         return ScanPlan(target=tgt, intent=prompt, tools=tools, reasoning=f"AI mavjud emas ({reason}). Intent asosida tool'lar tanlandi.")

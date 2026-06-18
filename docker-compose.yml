@@ -6,7 +6,7 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
-      - reports:/app/reports
+      - reports:/app/BACKEND/reports
       - models:/app/LOCAL_AI_MODELS
     env_file:
       - .env

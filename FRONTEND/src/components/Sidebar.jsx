@@ -86,7 +86,7 @@ const pages = [
   { id: 'settings', label: 'Sozlamalar', icon: '' },
 ]
 
-export default function Sidebar({ page, onNavigate, menuOpen, onToggle }) {
+export default function Sidebar({ page, onNavigate, menuOpen, onToggle, onLogout }) {
   const winWidth = useWindowSize()
   const isMobile = winWidth < 768
 
@@ -139,10 +139,7 @@ export default function Sidebar({ page, onNavigate, menuOpen, onToggle }) {
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <ThemeToggle />
           </div>
-          <button onClick={() => {
-            localStorage.removeItem('nexura_auth');
-            window.location.reload();
-          }} style={{
+          <button onClick={onLogout} style={{
             background: 'transparent',
             border: '1px solid #e74c3c',
             color: '#e74c3c',
@@ -153,7 +150,7 @@ export default function Sidebar({ page, onNavigate, menuOpen, onToggle }) {
             cursor: 'pointer',
             width: '100%',
           }}>
-            ⏻ CHIQISH
+            API KALITNI TOZALASH
           </button>
         </div>
       </aside>

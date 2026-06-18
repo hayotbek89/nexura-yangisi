@@ -8,28 +8,42 @@ import Scanner from './components/Scanner'
 import History from './components/History'
 import Reports from './components/Reports'
 import Settings from './components/Settings'
-import AccessKeyGate from './components/AccessKeyGate'
 import BackgroundPattern from './components/BackgroundPattern'
+import AccessKeyGate from './components/AccessKeyGate'
 import './App.css'
 
 export default function App() {
+  const [authenticated, setAuthenticated] = useState(() => !!localStorage.getItem('nexura_auth'))
   const [page, setPage] = useState('scanner')
   const [menuOpen, setMenuOpen] = useState(false)
   const winWidth = useWindowSize()
   const isMobile = winWidth < 768
 
+  const handleAccess = () => {
+    localStorage.setItem('nexura_auth', 'true')
+    setAuthenticated(true)
+  }
+
   const handleLogout = () => {
-    localStorage.removeItem('nexura_auth');
-    window.location.reload();
+    localStorage.removeItem('nexura_auth')
+    localStorage.removeItem('nexura_api_key')
+    setAuthenticated(false)
+  }
+
+  if (!authenticated) {
+    return (
+      <ThemeProvider>
+        <AccessKeyGate onAccess={handleAccess} />
+      </ThemeProvider>
+    )
   }
 
   return (
     <ThemeProvider>
       <BackgroundPattern />
-      <AccessKeyGate>
       <ScannerProvider>
         <ErrorBoundary>
-          <Sidebar page={page} onNavigate={(p) => { setPage(p); setMenuOpen(false) }} menuOpen={menuOpen} onToggle={() => setMenuOpen(!menuOpen)} />
+          <Sidebar page={page} onNavigate={(p) => { setPage(p); setMenuOpen(false) }} menuOpen={menuOpen} onToggle={() => setMenuOpen(!menuOpen)} onLogout={handleLogout} />
           <div style={{
             flex: 1, padding: '24px', overflow: 'auto',
             marginLeft: isMobile ? 0 : undefined,
@@ -50,7 +64,6 @@ export default function App() {
           </div>
         </ErrorBoundary>
       </ScannerProvider>
-      </AccessKeyGate>
     </ThemeProvider>
   )
 }

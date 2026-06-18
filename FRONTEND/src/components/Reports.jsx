@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import styled from 'styled-components'
+import { apiFetch } from '../api'
 
 const DownloadBtn = styled.button`
   width: 36px;
@@ -89,7 +90,7 @@ export default function Reports() {
   const [files, setFiles] = useState([])
 
   useEffect(() => {
-    fetch('/api/reports')
+    apiFetch('/api/reports')
       .then(r => r.json())
       .then(d => setFiles(d.files || []))
       .catch(() => setFiles([]))

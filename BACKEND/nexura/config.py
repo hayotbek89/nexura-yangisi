@@ -20,11 +20,11 @@ def ensure_dirs():
         _dirs_initialized = True
 
 LLAMA_MODEL_PATH = os.getenv("NEXURA_MODEL", str(MODELS_DIR / "qwen2.5-7b-instruct-q4_k_m.gguf"))
-LLAMA_N_CTX = int(os.getenv("NEXURA_CTX_SIZE", "4096"))
+LLAMA_N_CTX = int(os.getenv("NEXURA_CTX_SIZE", "8192"))
 LLAMA_N_THREADS = int(os.getenv("NEXURA_THREADS", "4"))
 LLAMA_N_GPU_LAYERS = int(os.getenv("NEXURA_GPU_LAYERS", "0"))
-LLAMA_TEMP = float(os.getenv("NEXURA_TEMP", "0.1"))
-LLAMA_MAX_TOKENS = int(os.getenv("NEXURA_MAX_TOKENS", "2048"))
+LLAMA_TEMP = float(os.getenv("NEXURA_TEMP", "0.7"))
+LLAMA_MAX_TOKENS = int(os.getenv("NEXURA_MAX_TOKENS", "4096"))
 
 WEB_HOST = os.getenv("NEXURA_WEB_HOST", "0.0.0.0")
 WEB_PORT = int(os.getenv("NEXURA_WEB_PORT", "8080"))
@@ -58,5 +58,6 @@ def is_tool_available(tool_name: str) -> bool:
 
 def get_env():
     env = os.environ.copy()
-    env["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
+    if os.name != "nt":
+        env["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
     return env

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { apiFetch } from '../api'
 
 export default function History() {
   const [sessions, setSessions] = useState([])
@@ -6,7 +7,7 @@ export default function History() {
   const [selected, setSelected] = useState(null)
 
   useEffect(() => {
-    fetch('/api/history')
+    apiFetch('/api/history')
       .then(r => r.json())
       .then(d => setSessions(d.reports || []))
       .catch(() => setSessions([]))

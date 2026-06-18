@@ -1,442 +1,359 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import styled, { keyframes } from 'styled-components'
-import { AnimatePresence, motion } from 'framer-motion'
+import React, { useState, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import styled from 'styled-components'
+import { useAudioSystem } from '../hooks/useAudioSystem'
+import BackgroundPattern from './BackgroundPattern'
 
-const SECRET_KEY = 'nexura-shadow-9685'
-const MAX_ATTEMPTS = 3
-const BLOCK_DURATION = 5 * 60 * 1000
+const CORRECT_KEY = 'nexura-shadow-9685'
 
-const shake = keyframes`
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-8px) rotate(-0.5deg); }
-  40% { transform: translateX(8px) rotate(0.5deg); }
-  60% { transform: translateX(-5px) rotate(-0.3deg); }
-  80% { transform: translateX(5px) rotate(0.3deg); }
-`
-
-const pulse = keyframes`
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.6; }
-`
-
-const blink = keyframes`
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-`
-
-const ambientFlow = keyframes`
-  to { stroke-dashoffset: 0; }
-`
-
-const Wrapper = styled.div`
+const Wrapper = styled(motion.div)`
   position: fixed;
   inset: 0;
-  background: #0a0e1a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9998;
-  overflow: hidden;
-`
-
-const ChipContainer = styled(motion.div)`
-  width: 90%;
-  max-width: 700px;
-`
-
-const StyledSvg = styled.svg`
-  display: block;
-  width: 100%;
-  height: auto;
-
-  .trace-bg {
-    stroke: #1a1a2e;
-    stroke-width: 1.8;
-    fill: none;
-  }
-
-  .trace-flow {
-    stroke-width: 1.8;
-    fill: none;
-    stroke-dasharray: 40 400;
-    stroke-dashoffset: 438;
-  }
-
-  .trace-flow.idle {
-    animation: ${ambientFlow} 6s cubic-bezier(0.5, 0, 0.9, 1) infinite;
-  }
-
-  .trace-flow.validating {
-    animation: ${ambientFlow} 0.6s cubic-bezier(0.5, 0, 0.9, 1) infinite;
-  }
-
-  .trace-flow.success {
-    animation: ${ambientFlow} 0.3s cubic-bezier(0.5, 0, 0.9, 1) forwards;
-  }
-`
-
-const ChipBody = styled.rect`
-  fill: ${({ $state }) =>
-    $state === 'error' ? '#1a0a0a' :
-    $state === 'success' ? '#0a1a0a' :
-    '#0f0f1a'};
-  stroke: ${({ $state }) =>
-    $state === 'error' ? '#ff3344' :
-    $state === 'success' ? '#00ff88' :
-    $state === 'validating' ? '#00aaff' :
-    '#222'};
-  transition: fill 0.3s, stroke 0.3s;
-  filter: drop-shadow(0 0 ${({ $state }) =>
-    $state === 'success' ? '20px rgba(0,255,136,0.4)' :
-    $state === 'validating' ? '12px rgba(0,170,255,0.3)' :
-    $state === 'error' ? '16px rgba(255,51,68,0.4)' :
-    '6px rgba(0,0,0,0.8)'});
-`
-
-const ChipText = styled.text`
-  font-family: 'Share Tech Mono', 'Courier New', monospace;
-  font-weight: bold;
-  letter-spacing: 2px;
-  fill: ${({ $state }) =>
-    $state === 'error' ? '#ff3344' :
-    $state === 'success' ? '#00ff88' :
-    $state === 'validating' ? '#00aaff' :
-    '#888'};
-  transition: fill 0.3s;
-  text-anchor: middle;
-  dominant-baseline: central;
-`
-
-const InputGroup = styled.foreignObject`
-  width: 120px;
-  height: 32px;
-  overflow: visible;
-`
-
-const StyledInput = styled.input`
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 170, 255, 0.06);
-  border: 1px solid ${({ $state }) =>
-    $state === 'error' ? '#ff3344' :
-    $state === 'success' ? '#00ff88' :
-    '#00aaff'};
-  color: ${({ $state }) =>
-    $state === 'error' ? '#ff3344' :
-    $state === 'success' ? '#00ff88' :
-    '#ddebf0'};
-  font-family: 'Share Tech Mono', 'Courier New', monospace;
-  font-size: 11px;
-  text-align: center;
-  outline: none;
-  padding: 0 4px;
-  box-sizing: border-box;
-  transition: border-color 0.3s, color 0.3s;
-
-  &::placeholder {
-    color: rgba(255, 255, 255, 0.15);
-    font-size: 9px;
-  }
-`
-
-const CursorSpan = styled.tspan`
-  animation: ${blink} 1s infinite;
-  fill: ${({ $state }) =>
-    $state === 'success' ? '#00ff88' :
-    $state === 'error' ? '#ff3344' :
-    '#00aaff'};
-`
-
-const StatusBar = styled.div`
-  position: absolute;
-  bottom: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 3px;
-  color: ${({ $state }) =>
-    $state === 'error' ? '#ff3344' :
-    $state === 'success' ? '#00ff88' :
-    $state === 'validating' ? '#00aaff' :
-    'rgba(255,255,255,0.2)'};
-  text-align: center;
-  transition: color 0.3s;
-`
-
-const Overlay = styled(motion.div)`
-  position: fixed;
-  inset: 0;
-  background: #0a0e1a;
   z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--bg);
+  overflow: hidden;
 `
 
-function getTraceColor(color) {
-  const map = {
-    purple: '#9900ff',
-    blue: '#00ccff',
-    yellow: '#ffea00',
-    green: '#00ff15',
-    red: '#ff3300',
+const Container = styled.div`
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  width: 100%;
+  max-width: 420px;
+  padding: 0 24px;
+`
+
+const Chip = styled(motion.div)`
+  width: 100px;
+  height: 100px;
+  position: relative;
+`
+
+const ChipBase = styled(motion.div)`
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border: 2px solid #27c39f;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 0 30px rgba(39, 195, 159, 0.3), inset 0 0 30px rgba(39, 195, 159, 0.1);
+`
+
+const ChipPins = styled.div`
+  position: absolute;
+  inset: -8px;
+`
+
+const Pin = styled(motion.div)`
+  position: absolute;
+  width: 6px;
+  height: 14px;
+  background: ${p => p.$active ? '#27c39f' : '#334155'};
+  border-radius: 2px;
+  box-shadow: ${p => p.$active ? '0 0 8px #27c39f' : 'none'};
+`
+
+const ChipIcon = styled.div`
+  font-size: 36px;
+  font-weight: 900;
+  color: #27c39f;
+  font-family: monospace;
+  letter-spacing: -2px;
+`
+
+const GlitchTitle = styled(motion.h1)`
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--primary);
+  text-align: center;
+  font-family: monospace;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+`
+
+const Subtitle = styled(motion.p)`
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  font-family: monospace;
+`
+
+const Input = styled(motion.input)`
+  width: 100%;
+  padding: 14px 18px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 16px;
+  font-family: monospace;
+  text-align: center;
+  letter-spacing: 3px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+  &:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 20px rgba(24, 95, 165, 0.2);
   }
-  return map[color] || '#00ccff'
+
+  &::placeholder {
+    letter-spacing: 1px;
+    color: var(--text-muted);
+  }
+`
+
+const StatusText = styled(motion.div)`
+  font-size: 12px;
+  font-family: monospace;
+  letter-spacing: 1px;
+  color: ${p => p.$color || 'var(--text-muted)'};
+  min-height: 20px;
+`
+
+const ScanLine = styled(motion.div)`
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  opacity: 0.5;
+  pointer-events: none;
+`
+
+const pins = [
+  { top: -6, left: '20%' }, { top: -6, left: '40%' }, { top: -6, left: '60%' }, { top: -6, left: '80%' },
+  { bottom: -6, left: '20%' }, { bottom: -6, left: '40%' }, { bottom: -6, left: '60%' }, { bottom: -6, left: '80%' },
+]
+
+function scramble(text) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*'
+  return text.split('').map(c => {
+    if (c === ' ') return ' '
+    return Math.random() > 0.7 ? chars[Math.floor(Math.random() * chars.length)] : c
+  }).join('')
 }
 
-function getTraceStyle(state, color) {
-  const base = { stroke: getTraceColor(color), filter: `drop-shadow(0 0 6px ${getTraceColor(color)})` }
-  if (state === 'idle') {
-    return { ...base, opacity: 0.15 }
-  }
-  if (state === 'error') {
-    return { ...base, stroke: '#ff3344', filter: 'drop-shadow(0 0 8px #ff3344)' }
-  }
-  return base
-}
-
-export default function AccessKeyGate({ children, onAccessGranted, secretKey = SECRET_KEY }) {
+export default function AccessKeyGate({ onAccess }) {
+  const [key, setKey] = useState('')
   const [state, setState] = useState('idle')
-  const [value, setValue] = useState('')
-  const [attempts, setAttempts] = useState(0)
-  const [blockedUntil, setBlockedUntil] = useState(0)
-  const [countdown, setCountdown] = useState(0)
-  const [showApp, setShowApp] = useState(false)
-  const inputRef = useRef(null)
+  const [statusText, setStatusText] = useState('')
+  const [errorCount, setErrorCount] = useState(0)
+  const [blockedUntil, setBlockedUntil] = useState(null)
+  const [displayTitle, setDisplayTitle] = useState('NEXURA')
+  const sounds = useAudioSystem()
 
   useEffect(() => {
-    const stored = localStorage.getItem('nx_blocked')
-    if (stored) {
-      const remaining = parseInt(stored) + BLOCK_DURATION - Date.now()
-      if (remaining > 0) {
-        setBlockedUntil(parseInt(stored))
-        setCountdown(Math.ceil(remaining / 1000))
-      } else {
-        localStorage.removeItem('nx_blocked')
-        localStorage.removeItem('nx_attempts')
-      }
+    const stored = localStorage.getItem('nx_blocked_until')
+    if (stored && Date.now() < parseInt(stored)) {
+      setBlockedUntil(parseInt(stored))
     }
   }, [])
 
   useEffect(() => {
-    if (!countdown) return
+    if (state === 'idle') {
+      const interval = setInterval(() => {
+        setDisplayTitle(scramble('NEXURA'))
+      }, 80)
+      setTimeout(() => {
+        clearInterval(interval)
+        setDisplayTitle('NEXURA')
+      }, 1000)
+      return () => clearInterval(interval)
+    }
+  }, [state])
+
+  useEffect(() => {
+    if (!blockedUntil) return
+    if (Date.now() >= blockedUntil) {
+      setBlockedUntil(null)
+      setErrorCount(0)
+      localStorage.removeItem('nx_blocked_until')
+      localStorage.removeItem('nx_blocked')
+      localStorage.removeItem('nexura_attempts')
+      return
+    }
     const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer)
-          setBlockedUntil(0)
-          localStorage.removeItem('nx_blocked')
-          localStorage.removeItem('nx_attempts')
-          return 0
-        }
-        return prev - 1
-      })
+      if (Date.now() >= blockedUntil) {
+        setBlockedUntil(null)
+        setErrorCount(0)
+        localStorage.removeItem('nx_blocked_until')
+        localStorage.removeItem('nx_blocked')
+        localStorage.removeItem('nexura_attempts')
+      }
     }, 1000)
     return () => clearInterval(timer)
-  }, [countdown])
+  }, [blockedUntil])
 
-  const handleSubmit = useCallback(() => {
-    if (blockedUntil && Date.now() < blockedUntil) return
-    if (!value.trim()) return
+  const handleSubmit = useCallback(async (e) => {
+    e?.preventDefault()
+    if (blockedUntil) return
+
+    const trimmed = key.trim()
+    if (!trimmed) return
 
     setState('validating')
+    setStatusText('')
+    sounds.validatsiya()
 
-    setTimeout(() => {
-      if (value === secretKey) {
-        setState('success')
-        localStorage.setItem('nexura_auth', 'true')
-        setTimeout(() => {
-          setShowApp(true)
-          if (onAccessGranted) onAccessGranted()
-        }, 1200)
-      } else {
-        setState('error')
-        const newAttempts = attempts + 1
-        setAttempts(newAttempts)
+    await new Promise(r => setTimeout(r, 1200))
 
-        if (newAttempts >= MAX_ATTEMPTS) {
-          const until = Date.now() + BLOCK_DURATION
-          localStorage.setItem('nx_blocked', String(until))
-          setBlockedUntil(until)
-          setCountdown(300)
-        }
-
-        setTimeout(() => {
-          setState('idle')
-          setValue('')
-        }, 1800)
+    if (trimmed === CORRECT_KEY) {
+      sounds.ruxsat()
+      setStatusText('ACCESS GRANTED')
+      setState('success')
+      localStorage.removeItem('nx_blocked_until')
+      localStorage.removeItem('nx_blocked')
+      localStorage.removeItem('nexura_attempts')
+      await new Promise(r => setTimeout(r, 1500))
+      onAccess()
+    } else {
+      sounds.radEtildi()
+      setStatusText('ACCESS DENIED')
+      setState('error')
+      const attempts = parseInt(localStorage.getItem('nexura_attempts') || '0') + 1
+      localStorage.setItem('nexura_attempts', attempts.toString())
+      setErrorCount(attempts)
+      if (attempts >= 3) {
+        const until = Date.now() + 5 * 60 * 1000
+        localStorage.setItem('nx_blocked_until', until.toString())
+        localStorage.setItem('nx_blocked', 'true')
+        setBlockedUntil(until)
       }
-    }, 1500)
-  }, [value, secretKey, blockedUntil, attempts, onAccessGranted])
-
-  const traces = [
-    { d: 'M100 100 H200 V210 H326', color: 'purple' },
-    { d: 'M80 180 H180 V230 H326', color: 'blue' },
-    { d: 'M60 260 H150 V250 H326', color: 'yellow' },
-    { d: 'M100 350 H200 V270 H326', color: 'green' },
-    { d: 'M700 90 H560 V210 H474', color: 'blue' },
-    { d: 'M740 160 H580 V230 H474', color: 'green' },
-    { d: 'M720 250 H590 V250 H474', color: 'red' },
-    { d: 'M680 340 H570 V270 H474', color: 'yellow' },
-  ]
-
-  const statusText = () => {
-    if (blockedUntil && Date.now() < blockedUntil) {
-      const mins = String(Math.floor(countdown / 60)).padStart(2, '0')
-      const secs = String(countdown % 60).padStart(2, '0')
-      return `⛔ BLOKLANGAN  ${mins}:${secs}`
+      await new Promise(r => setTimeout(r, 2000))
+      setKey('')
+      setState('idle')
+      setStatusText('')
     }
-    switch (state) {
-      case 'validating':
-        return '⬡ TEKSHIRILMOQDA...'
-      case 'success':
-        return '✓ KIRISH TASDIQLANDI'
-      case 'error':
-        return '✗ KIRISH RAD ETILDI'
-      default:
-        return attempts > 0 ? `URINISH ${attempts}/${MAX_ATTEMPTS}` : '▶ KALIT KIRITING'
-    }
-  }
+  }, [key, blockedUntil, sounds, onAccess])
 
-  const chipText = () => {
-    switch (state) {
-      case 'validating':
-        return 'VALIDATING'
-      case 'success':
-        return 'ACCESS GRANTED'
-      case 'error':
-        return 'ACCESS DENIED'
-      default:
-        return ''
-    }
-  }
-
-  if (showApp) {
-    return <>{children}</>
-  }
+  const blockedLeft = blockedUntil ? Math.max(0, Math.floor((blockedUntil - Date.now()) / 1000)) : 0
 
   return (
-    <Overlay
-      initial={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.8, ease: 'easeInOut' }}
-    >
-      <AnimatePresence mode="wait">
-        {state === 'success' ? (
-          <ChipContainer
-            key="success-chip"
-            initial={{ scale: 1, opacity: 1 }}
-            animate={{ scale: 3, opacity: 0 }}
-            exit={{ scale: 4, opacity: 0 }}
-            transition={{ duration: 1.2, ease: 'easeInOut' }}
-            onAnimationComplete={() => setShowApp(true)}
-          >
-            <ChipSvg state={state} chipText={chipText()} traces={traces} inputValue={value} setInputValue={setValue} onSubmit={handleSubmit} blocked={blockedUntil > Date.now()} inputRef={inputRef} attempts={attempts} />
-          </ChipContainer>
-        ) : (
-          <ChipContainer
-            key="chip"
-            animate={state === 'error' ? { x: [0, -8, 8, -5, 5, 0] } : { x: 0 }}
-            transition={state === 'error' ? { duration: 0.4 } : { duration: 0.2 }}
-          >
-            <ChipSvg state={state} chipText={chipText()} traces={traces} inputValue={value} setInputValue={setValue} onSubmit={handleSubmit} blocked={blockedUntil > Date.now()} inputRef={inputRef} attempts={attempts} />
-          </ChipContainer>
-        )}
-      </AnimatePresence>
-      <StatusBar $state={state}>{statusText()}</StatusBar>
-    </Overlay>
-  )
-}
+    <AnimatePresence>
+      <Wrapper
+        initial={{ opacity: 1 }}
+        exit={{ opacity: 0, scale: 1.1 }}
+        transition={{ duration: 0.6, ease: 'easeInOut' }}
+      >
+        <BackgroundPattern />
+        <ScanLine
+          animate={{ top: ['-10%', '110%'] }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+        />
+        <Container>
+          <Chip>
+            <ChipPins>
+              {pins.map((p, i) => (
+                <Pin
+                  key={i}
+                  style={p}
+                  $active={state === 'success'}
+                  animate={state === 'validating' ? {
+                    opacity: [0.3, 1, 0.3],
+                    transition: { duration: 0.5, repeat: Infinity, delay: i * 0.05 }
+                  } : state === 'success' ? {
+                    opacity: 1,
+                    boxShadow: ['0 0 0px #27c39f', '0 0 12px #27c39f', '0 0 0px #27c39f'],
+                    transition: { duration: 1, repeat: Infinity }
+                  } : {}}
+                />
+              ))}
+            </ChipPins>
+            <ChipBase
+              animate={state === 'validating' ? {
+                boxShadow: ['0 0 30px rgba(39,195,159,0.3)', '0 0 60px rgba(39,195,159,0.6)', '0 0 30px rgba(39,195,159,0.3)'],
+                transition: { duration: 1, repeat: Infinity }
+              } : state === 'success' ? {
+                boxShadow: ['0 0 30px rgba(39,195,159,0.3)', '0 0 80px rgba(39,195,159,0.8)', '0 0 30px rgba(39,195,159,0.3)'],
+                transition: { duration: 0.8, repeat: Infinity }
+              } : state === 'error' ? {
+                boxShadow: ['0 0 30px rgba(239,68,68,0.3)', '0 0 60px rgba(239,68,68,0.6)', '0 0 30px rgba(239,68,68,0.3)'],
+                borderColor: ['#ef4444', '#ef4444'],
+                transition: { duration: 0.3, repeat: 3 }
+              } : {}}
+            >
+              <ChipIcon>
+                {state === 'success' ? 'OK' : state === 'error' ? '!!' : 'NX'}
+              </ChipIcon>
+            </ChipBase>
+          </Chip>
 
-function ChipSvg({ state, chipText, traces, inputValue, setInputValue, onSubmit, blocked, inputRef, attempts }) {
-  const showInput = state === 'idle'
+          <div style={{ textAlign: 'center' }}>
+            <GlitchTitle
+              animate={state === 'error' ? {
+                x: [0, -4, 4, -2, 2, 0],
+                transition: { duration: 0.3 }
+              } : {}}
+            >
+              {displayTitle}
+            </GlitchTitle>
+            <Subtitle
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+            >
+              KIBERXAVFSIZLIK SKANERI
+            </Subtitle>
+          </div>
 
-  return (
-    <StyledSvg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="chipGradient" x1={0} y1={0} x2={0} y2={1}>
-          <stop offset="0%" stopColor="#2a2a3a" />
-          <stop offset="100%" stopColor="#0f0f1a" />
-        </linearGradient>
-        <linearGradient id="textGradient" x1={0} y1={0} x2={0} y2={1}>
-          <stop offset="0%" stopColor="#eeeeee" />
-          <stop offset="100%" stopColor="#888888" />
-        </linearGradient>
-        <linearGradient id="pinGradient" x1={1} y1={0} x2={0} y2={0}>
-          <stop offset="0%" stopColor="#bbbbbb" />
-          <stop offset="50%" stopColor="#888888" />
-          <stop offset="100%" stopColor="#555555" />
-        </linearGradient>
-      </defs>
+          {blockedUntil ? (
+            <StatusText $color="#ef4444" style={{ fontSize: 14 }}>
+              BLOKLANGAN — {Math.floor(blockedLeft / 60)}:{(blockedLeft % 60).toString().padStart(2, '0')}
+            </StatusText>
+          ) : (
+            <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <Input
+                type="password"
+                value={key}
+                onChange={e => { setKey(e.target.value); sounds.keyPress() }}
+                placeholder="access key"
+                disabled={state === 'validating'}
+                animate={state === 'error' ? {
+                  x: [0, -6, 6, -4, 4, 0],
+                  borderColor: ['#ef4444', '#ef4444', 'var(--border)'],
+                  transition: { duration: 0.4 }
+                } : {}}
+                autoFocus
+              />
+              <motion.button
+                type="submit"
+                disabled={state === 'validating' || !key.trim()}
+                style={{
+                  padding: '12px 24px',
+                  background: state === 'validating' ? 'var(--bg-input)' : 'var(--primary)',
+                  border: '1px solid var(--primary)',
+                  borderRadius: 'var(--radius)',
+                  color: '#fff',
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  letterSpacing: 2,
+                  cursor: state === 'validating' ? 'not-allowed' : 'pointer',
+                  textTransform: 'uppercase',
+                  opacity: !key.trim() ? 0.5 : 1,
+                }}
+                whileHover={key.trim() && state !== 'validating' ? { scale: 1.02 } : {}}
+                whileTap={key.trim() && state !== 'validating' ? { scale: 0.98 } : {}}
+              >
+                {state === 'validating' ? 'Tekshirilmoqda...' : 'Kirish'}
+              </motion.button>
+            </form>
+          )}
 
-      <g id="traces">
-        {traces.map((t, i) => (
-          <React.Fragment key={i}>
-            <path d={t.d} className="trace-bg" />
-            <path
-              d={t.d}
-              className={`trace-flow ${state}`}
-              style={getTraceStyle(state, t.color)}
-            />
-          </React.Fragment>
-        ))}
-      </g>
-
-      <ChipBody
-        x={330} y={190} width={140} height={100} rx={20} ry={20}
-        fill="url(#chipGradient)"
-        strokeWidth={3}
-        $state={state}
-      />
-
-      {/* pins left */}
-      <g>
-        {[205, 225, 245, 265].map((y) => (
-          <rect key={y} x={322} y={y} width={8} height={10} fill="url(#pinGradient)" rx={2} />
-        ))}
-      </g>
-
-      {/* pins right */}
-      <g>
-        {[205, 225, 245, 265].map((y) => (
-          <rect key={y} x={470} y={y} width={8} height={10} fill="url(#pinGradient)" rx={2} />
-        ))}
-      </g>
-
-      {/* center content */}
-      {showInput ? (
-        <InputGroup x={340} y={234} width={120} height={32}>
-          <StyledInput
-            ref={inputRef}
-            type="password"
-            placeholder="KEY"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !blocked && onSubmit()}
-            disabled={blocked}
-            autoFocus
-            $state={state}
-          />
-        </InputGroup>
-      ) : (
-        <ChipText
-          x={400} y={250}
-          fontSize={chipText === 'ACCESS GRANTED' || chipText === 'ACCESS DENIED' ? 12 : 13}
-          $state={state}
-        >
-          {chipText}
-          {state === 'validating' && <CursorSpan $state={state}>|</CursorSpan>}
-        </ChipText>
-      )}
-
-      {/* nodes */}
-      {[
-        [100, 100], [80, 180], [60, 260], [100, 350],
-        [700, 90], [740, 160], [720, 250], [680, 340]
-      ].map(([cx, cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r={5} fill={state === 'error' ? '#ff3344' : '#111'} />
-      ))}
-    </StyledSvg>
+          <StatusText $color={state === 'success' ? '#22c55e' : state === 'error' ? '#ef4444' : 'var(--text-muted)'}>
+            {statusText || (errorCount > 0 ? `${3 - errorCount} ta urinish qoldi` : '')}
+          </StatusText>
+        </Container>
+      </Wrapper>
+    </AnimatePresence>
   )
 }

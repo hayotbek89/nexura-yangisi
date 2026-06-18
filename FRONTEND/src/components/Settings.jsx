@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react'
+import { apiFetch, getApiKey } from '../api'
 
 export default function Settings() {
   const [status, setStatus] = useState(null)
   const [host, setHost] = useState('')
+  const [apiKey, setApiKey] = useState(getApiKey())
+  const [keyMessage, setKeyMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -16,6 +19,23 @@ export default function Settings() {
     }).catch(() => setError('Serverga ulanishda xatolik'))
       .finally(() => setLoading(false))
   }, [])
+
+  const saveApiKey = async (e) => {
+    e.preventDefault()
+    const trimmed = apiKey.trim()
+    if (trimmed) {
+      localStorage.setItem('nexura_api_key', trimmed)
+    } else {
+      localStorage.removeItem('nexura_api_key')
+    }
+
+    try {
+      const res = await apiFetch('/api/stats')
+      setKeyMessage(res.ok ? 'API key saqlandi va tekshirildi.' : 'API key saqlandi, lekin server rad etdi.')
+    } catch {
+      setKeyMessage('API key saqlandi. Server bilan tekshirib bo‘lmadi.')
+    }
+  }
 
   if (loading) {
     return (
@@ -49,6 +69,37 @@ export default function Settings() {
           </div>
         </div>
       )}
+
+      <form onSubmit={saveApiKey} style={{
+        background: 'var(--bg-card)', borderRadius: 'var(--radius)',
+        padding: 16, marginBottom: 24,
+        border: '1px solid var(--border)',
+      }}>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>Backend API key</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={e => setApiKey(e.target.value)}
+            placeholder="NEXURA_API_KEY"
+            style={{
+              flex: 1, minWidth: 240, padding: '10px 12px',
+              borderRadius: 'var(--radius)', border: '1px solid var(--border)',
+              background: 'var(--bg-input)', color: 'var(--text)',
+            }}
+          />
+          <button type="submit" style={{
+            padding: '10px 14px', borderRadius: 'var(--radius)',
+            border: '1px solid var(--primary)', background: 'var(--primary)',
+            color: '#fff', cursor: 'pointer',
+          }}>
+            Saqlash
+          </button>
+        </div>
+        {keyMessage && (
+          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>{keyMessage}</div>
+        )}
+      </form>
 
       <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius)', padding: 24, marginBottom: 24 }}>
         <h3 style={{ marginBottom: 16 }}>Tizim holati</h3>

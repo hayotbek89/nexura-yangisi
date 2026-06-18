@@ -45,6 +45,13 @@ def _sanitize_args(tool: ToolType, args: list[str]) -> list[str]:
     return clean
 
 
+def _resolve_binary(tool: ToolType) -> str | None:
+    configured = TOOL_PATHS.get(tool.value)
+    if configured and os.path.isfile(configured):
+        return configured
+    return shutil.which(tool.value)
+
+
 class ScanRunner:
     PARSER_MAP = {}
 
@@ -88,8 +95,8 @@ class ScanRunner:
                         ports_list.append(int(part))
             return scanner.quick_scan(target, ports_list or None)
 
-        binary = TOOL_PATHS.get(tool.value, tool.value)
-        if not os.path.isfile(binary):
+        binary = _resolve_binary(tool)
+        if not binary:
             result.error = f"{tool.value} topilmadi. O'rnatish kerak."
             result.end_time = datetime.now()
             return result

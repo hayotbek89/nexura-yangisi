@@ -41,6 +41,7 @@ RUN curl -fL https://github.com/projectdiscovery/nuclei/releases/download/v3.9.0
     && rm -rf /tmp/nuclei.zip /tmp/nuclei
 
 RUN curl -fL https://github.com/OJ/gobuster/releases/download/v3.8.2/gobuster_Linux_x86_64.tar.gz -o /tmp/gobuster.tar.gz \
+    && mkdir -p /tmp/gobuster \
     && tar -xzf /tmp/gobuster.tar.gz -C /tmp/gobuster \
     && mv /tmp/gobuster/gobuster /usr/local/bin/gobuster \
     && rm -rf /tmp/gobuster.tar.gz /tmp/gobuster

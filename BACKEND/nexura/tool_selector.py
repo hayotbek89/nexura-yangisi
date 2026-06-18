@@ -203,6 +203,8 @@ class ToolSelector:
 
     def _fallback_plan(self, prompt: str, target: str | None, reason: str) -> ScanPlan:
         tgt = target or "unknown"
+        if tgt == "unknown":
+            return ScanPlan(target="unknown", intent=prompt, tools=[], reasoning=f"AI mavjud emas ({reason}). Target aniqlanmadi.")
         p = prompt.lower()
         if any(w in p for w in ("sql", "injection", "database", "db")):
             tools = [

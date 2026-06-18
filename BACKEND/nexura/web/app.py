@@ -243,7 +243,23 @@ async def start_scan(req: ScanRequest, request: Request, _=Depends(_verify_token
         selector = ToolSelector(engine)
         state.selector = selector
 
-    plan = await selector.create_plan_async(req.prompt, req.target)
+    target = req.target
+    if not target:
+        domain_match = re.search(r'([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}', req.prompt)
+        ip_match = re.search(r'\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b', req.prompt)
+        url_match = re.search(r'(https?://[^\s]+)', req.prompt)
+        if url_match:
+            target = url_match.group(1)
+        elif domain_match:
+            target = domain_match.group(0)
+        elif ip_match:
+            target = ip_match.group(1)
+
+    plan = await selector.create_plan_async(req.prompt, target)
+
+    if plan.target in (None, "unknown", ""):
+        return JSONResponse(status_code=400, content={"error": "Target aniqlanmadi. Iltimos, sayt manzilini kiriting."})
+
     report = state.reporter.create_report(plan.target, plan.intent)
 
     if req.agentic and selector.engine.is_ready:
@@ -503,11 +519,11 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
                   "qisqa va tushunarli javob ber. "
                   "Skanerlash kerak bo'lsa ayt.")
         try:
-            ai_response = await state.engine.ask_async(system, message, timeout=60)
+            ai_response = await state.engine.ask_async(system, message, timeout=config.AI_TIMEOUT)
             return {"response": ai_response, "intent": "cyber_question", "scan_data": None}
         except Exception as e:
             err = str(e)
-            if "timeout" in err.lower() or "60" in err:
+            if "timeout" in err.lower() or str(config.AI_TIMEOUT) in err:
                 return {"response": "AI hozir band, terminal orqali ishlashingiz mumkin: nmap -F example.com", "intent": "chat", "scan_data": None}
             return {"response": f"AI modeldan javob olishda xatolik yuz berdi: {e}", "intent": "chat", "scan_data": None}
 
@@ -519,7 +535,33 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
         selector = ToolSelector(state.engine)
         state.selector = selector
 
-    plan = await selector.create_plan_async(message, req.target)
+    # Extract target from message if not explicitly provided
+    target = req.target
+    if not target:
+        domain_match = re.search(r'([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}', message)
+        ip_match = re.search(r'\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b', message)
+        url_match = re.search(r'(https?://[^\s]+)', message)
+        if url_match:
+            target = url_match.group(1)
+        elif domain_match:
+            target = domain_match.group(0)
+        elif ip_match:
+            target = ip_match.group(1)
+
+    plan = await selector.create_plan_async(message, target)
+
+    if plan.target in (None, "unknown", ""):
+        return {
+            "response": "Target (sayt manzili) aniqlanmadi. Iltimos, tekshiriladigan saytning domen yoki IP manzilini kiriting. Masalan: example.com yoki 192.168.1.1",
+            "intent": "scan", "scan_data": None,
+        }
+
+    if not plan.tools:
+        return {
+            "response": f"**{plan.target}** bo'yicha skanerlash rejasi tuzilmadi. Sabab: {plan.reasoning}",
+            "intent": "scan", "scan_data": None,
+        }
+
     report = state.reporter.create_report(plan.target, plan.intent)
 
     if req.agentic and selector.engine.is_ready:

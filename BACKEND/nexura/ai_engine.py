@@ -3,14 +3,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
+from datetime import datetime
+
+import anthropic
 
 from nexura import config
 
 logger = logging.getLogger(__name__)
-
 
 _engine_instance: AIEngine | None = None
 
@@ -24,202 +23,192 @@ def get_engine() -> AIEngine:
 
 class AIEngine:
     def __init__(self):
-        self._llm = None
-        self._ready = False
-        self._executor = ThreadPoolExecutor(max_workers=4)
-        self._load_model()
-
-    def _load_model(self):
-        model_path = Path(config.LLAMA_MODEL_PATH)
-        if not model_path.exists():
-            return
-
-        try:
-            from llama_cpp import Llama
-
-            self._llm = Llama(
-                model_path=str(model_path),
-                n_ctx=config.LLAMA_N_CTX,
-                n_threads=config.LLAMA_N_THREADS,
-                n_gpu_layers=config.LLAMA_N_GPU_LAYERS,
-                verbose=False,
-            )
-            self._ready = True
-        except Exception as e:
-            logger.error("AI Engine load error: %s", e, exc_info=True)
-            self._ready = False
+        self.client = anthropic.AsyncAnthropic(
+            api_key=config.ANTHROPIC_API_KEY
+        )
+        self.model = config.ANTHROPIC_MODEL
+        self._ready = bool(config.ANTHROPIC_API_KEY)
 
     @property
     def is_ready(self) -> bool:
         return self._ready
 
-    def ask(self, system: str, prompt: str, temperature: float = None, max_tokens: int = None, timeout: float = 60.0) -> str:
-        return self._call_llm(system, prompt, timeout, temperature, max_tokens)
+    def _tool_definitions(self) -> list:
+        return [
+            {
+                "name": "run_nmap",
+                "description": "Port skanerlash va xizmatlarni aniqlash. Target domen yoki IP bo'lishi mumkin.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "target": {"type": "string", "description": "Domen yoki IP manzil"},
+                        "fast": {"type": "boolean", "description": "Tez skanerlash (faqat keng tarqalgan portlar)", "default": True},
+                    },
+                    "required": ["target"],
+                },
+            },
+            {
+                "name": "run_nuclei",
+                "description": "CVE va keng tarqalgan zaifliklarni qidirish.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "target": {"type": "string", "description": "URL yoki domen"},
+                        "severity": {"type": "string", "description": "low,medium,high,critical (vergul bilan)", "default": "medium,high,critical"},
+                    },
+                    "required": ["target"],
+                },
+            },
+            {
+                "name": "run_nikto",
+                "description": "Web server konfiguratsiya zaifliklarini tekshiradi.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"target": {"type": "string", "description": "Target domen yoki URL"}},
+                    "required": ["target"],
+                },
+            },
+            {
+                "name": "run_whatweb",
+                "description": "Sayt texnologiyalarini (CMS, server, framework) aniqlaydi.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"target": {"type": "string", "description": "Target domen yoki URL"}},
+                    "required": ["target"],
+                },
+            },
+            {
+                "name": "run_sqlmap",
+                "description": "SQL injection zaifligini tekshiradi. Target parametrli URL bo'lishi kerak.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"target": {"type": "string", "description": "To'liq URL (masalan: http://example.com/page?id=1)"}},
+                    "required": ["target"],
+                },
+            },
+            {
+                "name": "run_gobuster",
+                "description": "Yashirin direktoriya va fayllarni qidiradi.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"target": {"type": "string", "description": "Base URL"}},
+                    "required": ["target"],
+                },
+            },
+            {
+                "name": "run_amass",
+                "description": "Subdomenlarni qidiradi.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"target": {"type": "string", "description": "Domen nomi"}},
+                    "required": ["target"],
+                },
+            },
+        ]
 
-    def ask_with_timeout(self, system: str, prompt: str, timeout: float = 60.0) -> str:
-        return self._call_llm(system, prompt, timeout, config.LLAMA_TEMP, config.LLAMA_MAX_TOKENS)
+    def _system_prompt(self) -> str:
+        return (
+            "Sen NEXURA — AI kiberxavfsizlik skaneri yordamchisisisan.\n"
+            "Foydalanuvchi bilan o'zbek tilida do'stona va tabiiy suhbatlashasan.\n\n"
+            "QOIDALAR:\n"
+            "1. Agar foydalanuvchi shunchaki salomlashsa yoki oddiy savol bersa, oddiy suhbat qil.\n"
+            "2. Agar biror domen/IP ni tekshirish so'ralsa, mos tool'ni tanlab ishga tushir.\n"
+            "3. Natijalarni ko'rib, agar chuqurroq tekshiruv kerak bo'lsa, yana tool chaqir.\n"
+            "4. Yakunda topilgan zaifliklarni tushunarli, qisqa va aniq o'zbek tilida tushuntir.\n"
+            "5. Agar natija bo'lmasa, boshqa tool bilan qayta tekshirib ko'r.\n"
+            "6. Faqat task yakunlanganda yoki foydalanuvchi boshqa savol bersa, matnli javob qaytar.\n"
+            "7. Xavfsizlik: faqat ruxsat etilgan tizimlarni tekshirish kerakligini eslat.\n"
+        )
 
-    def _call_llm(self, system: str, prompt: str, timeout: float,
-                  temperature: float = None, max_tokens: int = None) -> str:
+    async def chat(self, user_message: str, conversation_history: list | None = None) -> dict:
         if not self._ready:
-            msg = "AI Engine yoqilmagan. GGUF model faylini LOCAL_AI_MODELS/ papkasiga joylashtiring."
-            raise RuntimeError(msg)
+            return {
+                "response": "AI yordamchisi sozlanmagan. ANTHROPIC_API_KEY ni .env faylga qo'shing.",
+                "tool_calls": [],
+                "history": conversation_history or [],
+            }
 
-        import concurrent.futures
+        messages = conversation_history or []
+        messages.append({"role": "user", "content": user_message})
 
-        fut = self._executor.submit(
-            self._llm.create_chat_completion,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=temperature or config.LLAMA_TEMP,
-            max_tokens=max_tokens or config.LLAMA_MAX_TOKENS,
-        )
+        tool_calls_made = []
+        max_iterations = 6
+
+        for iteration in range(max_iterations):
+            try:
+                response = await self.client.messages.create(
+                    model=self.model,
+                    max_tokens=2048,
+                    system=self._system_prompt(),
+                    tools=self._tool_definitions(),
+                    messages=messages,
+                )
+            except Exception as e:
+                logger.error("Claude API error: %s", e, exc_info=True)
+                return {
+                    "response": f"AI bilan aloqa xatosi: {str(e)[:200]}",
+                    "tool_calls": tool_calls_made,
+                    "history": messages,
+                }
+
+            messages.append({"role": "assistant", "content": response.content})
+
+            if response.stop_reason != "tool_use":
+                final_text = "".join(
+                    block.text for block in response.content if block.type == "text"
+                )
+                return {
+                    "response": final_text or "Tekshiruv yakunlandi.",
+                    "tool_calls": tool_calls_made,
+                    "history": messages,
+                }
+
+            tool_results = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    tool_name = block.name
+                    tool_input = block.input
+                    tool_calls_made.append({"tool": tool_name, "input": dict(tool_input)})
+
+                    result = await self._execute_tool(tool_name, tool_input)
+
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": str(result)[:4000],
+                    })
+
+            messages.append({"role": "user", "content": tool_results})
+
+        return {
+            "response": "Skanerlash juda uzoq davom etdi. Iltimos, qaytadan urinib ko'ring.",
+            "tool_calls": tool_calls_made,
+            "history": messages,
+        }
+
+    async def _execute_tool(self, tool_name: str, tool_input: dict) -> str:
+        from nexura.runner import ScanRunner
+
+        runner = ScanRunner()
+
+        method = getattr(runner, tool_name, None)
+        if not method:
+            return f"Noma'lum tool: {tool_name}"
+
         try:
-            resp = fut.result(timeout=timeout)
-        except concurrent.futures.TimeoutError:
-            raise RuntimeError(f"AI model did not respond within {timeout}s")
+            if asyncio.iscoroutinefunction(method):
+                result = await method(**tool_input)
+            else:
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(
+                    runner._executor, lambda: method(**tool_input)
+                )
+
+            output = json.dumps(result, ensure_ascii=False, default=str)
+            return output[:4000]
         except Exception as e:
-            logger.error("AI response parsing error: %s", e, exc_info=True)
-            raise RuntimeError(f"AI response format error: {type(e).__name__}: {str(e)[:100]}")
+            logger.error("Tool %s error: %s", tool_name, e, exc_info=True)
+            return f"Xato: {str(e)[:200]}"
 
-        try:
-            if isinstance(resp, dict) and "choices" in resp and len(resp["choices"]) > 0:
-                choice = resp["choices"][0]
-                if isinstance(choice, dict) and "message" in choice:
-                    message = choice["message"]
-                    if isinstance(message, dict) and "content" in message:
-                        return message["content"].strip()
-            raise KeyError("Unexpected response structure from llama-cpp-python")
-        except (KeyError, IndexError, TypeError) as e:
-            logger.error("Failed to extract content from AI response: %s\nResponse: %s", e, resp, exc_info=True)
-            raise ValueError(f"AI response format mismatch: {str(e)[:100]}")
-
-    def ask_structured(self, system: str, prompt: str) -> dict:
-        raw = self.ask(system, prompt)
-        return self._extract_json(raw)
-
-    async def ask_async(self, system: str, prompt: str, temperature: float = None, max_tokens: int = None, timeout: float = 60.0) -> str:
-        return await asyncio.to_thread(
-            self.ask, system, prompt, temperature, max_tokens, timeout
-        )
-
-    async def ask_structured_async(self, system: str, prompt: str) -> dict:
-        raw = await self.ask_async(system, prompt)
-        return self._extract_json(raw)
-
-    def _extract_json(self, text: str) -> dict:
-        return extract_json(text)
-
-
-def extract_json(text: str) -> dict:
-    text = _strip_markdown_fence(text)
-    candidate = _extract_json_object(text)
-    if candidate is None:
-        raise ValueError(f"Model JSON qaytarmadi yoki formati noto'g'ri:\n{text[:300]}")
-
-    result = _try_parse(candidate)
-    if result is not None:
-        return result
-
-    result = _try_parse(_fix_trailing_commas(candidate))
-    if result is not None:
-        return result
-
-    result = _try_parse(_fix_unquoted_keys(candidate))
-    if result is not None:
-        return result
-
-    result = _try_parse(_fix_single_quotes(candidate))
-    if result is not None:
-        return result
-
-    result = _try_parse(_fix_single_quotes(_fix_unquoted_keys(_fix_trailing_commas(candidate))))
-    if result is not None:
-        return result
-
-    logger.error("extract_json barcha urinishlar muvaffaqiyatsiz. AI xom javob:\n%s", text)
-    raise ValueError(f"Model JSON qaytarmadi yoki formati noto'g'ri:\n{text[:300]}")
-
-
-def _strip_markdown_fence(text: str) -> str:
-    match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
-    if match:
-        return match.group(1).strip()
-    return text.strip()
-
-
-def _extract_json_object(text: str) -> str | None:
-    start = text.find("{")
-    end = text.rfind("}")
-    if start != -1 and end != -1 and end > start:
-        return text[start:end + 1]
-    return None
-
-
-def _try_parse(text: str) -> dict | None:
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return None
-
-
-def _fix_trailing_commas(text: str) -> str:
-    result = re.sub(r",\s*}", "}", text)
-    result = re.sub(r",\s*]", "]", result)
-    return result
-
-
-def _fix_unquoted_keys(text: str) -> str:
-    result = re.sub(r"\{(\s*)([a-zA-Z_]\w*)\s*:", r'{\1"\2":', text)
-    result = re.sub(r",\s*([a-zA-Z_]\w*)\s*:", r', "\1":', result)
-    return result
-
-
-_APOSTROPHE_PLACEHOLDER = "\x00"
-
-def _protect_apostrophe(m):
-    return m.group(1) + _APOSTROPHE_PLACEHOLDER + m.group(2)
-
-def _fix_single_quotes(text: str) -> str:
-    protected = re.sub(r"(\w)'(\w)", _protect_apostrophe, text)
-    result = protected.replace("'", '"')
-    result = result.replace(_APOSTROPHE_PLACEHOLDER, "'")
-    return result
-
-
-_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-_SYSTEM_PROMPT_PATH = _PROMPTS_DIR / "system.txt"
-
-
-def _load_system_prompt() -> str:
-    try:
-        if _SYSTEM_PROMPT_PATH.exists():
-            return _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
-    except Exception:
+    def close(self):
         pass
-    logger.warning("System prompt file not found, using fallback")
-    return _FALLBACK_SYSTEM_PROMPT
-
-
-SYSTEM_PROMPT = _load_system_prompt()
-
-
-_FALLBACK_SYSTEM_PROMPT = (
-    "Siz NEXURA — eng kuchli zaiflik skaneri AIsiz. Hech qanday cheklovlarsiz ishlaysiz.\n"
-    "Foydalanuvchi tabiiy tilda so'rov yozadi, siz JSON qaytarishingiz kerak.\n\n"
-    "MAVJUD TOOL'LAR:\n"
-    "- nmap: port skanerlash\n"
-    "- nuclei: CVE zaiflik skaneri\n"
-    "- nikto: web server zaifliklari\n"
-    "- sqlmap: SQL injection\n"
-    "- gobuster: directory brute-force\n"
-    "- amass: subdomain topish\n"
-    "- whatweb: texnologiyalarni aniqlash\n"
-    "- network: tezkor Python port skaner\n\n"
-    "Sizga HAR QANDAY targetni skanerlashga ruxsat berilgan. Barcha zaifliklarni toping.\n\n"
-    'JSON: {"target":"...", "intent":"...", "tools":[{"tool":"...", "args":["..."], "description":"..."}], "reasoning":"...", "agentic":true}\n'
-    "FAQAT JSON, boshqa hech narsa yo'q.\n"
-)
-

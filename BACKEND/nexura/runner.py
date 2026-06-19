@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -71,7 +72,6 @@ class ScanRunner:
         }
 
     def __init__(self):
-        # B.3 Performance: Configurable thread pool (environment-based)
         num_workers = int(os.getenv("NEXURA_SCANNER_WORKERS", str(min(4, os.cpu_count() or 2))))
         self._executor = ThreadPoolExecutor(max_workers=max(1, num_workers))
         self._cve_lookup = CVELookup()
@@ -163,3 +163,75 @@ class ScanRunner:
         if parser:
             return parser(output)
         return ParserResult(summary=output[:200])
+
+    # ---- Individual tool methods for Claude tool calling ----
+
+    def run_nmap(self, target: str, fast: bool = True) -> dict:
+        args = ["-sV", "-sC"]
+        if fast:
+            args += ["-F"]
+        else:
+            args += ["-p-"]
+        args.append(target)
+        tc = ToolCommand(tool=ToolType.NMAP, args=args, description="Port scan")
+        result = self.run(tc, target)
+        return self._result_to_dict(result)
+
+    def run_nuclei(self, target: str, severity: str = "medium,high,critical") -> dict:
+        args = ["-severity", severity, target]
+        tc = ToolCommand(tool=ToolType.NUCLEI, args=args, description="Vulnerability scan")
+        result = self.run(tc, target)
+        return self._result_to_dict(result)
+
+    def run_nikto(self, target: str) -> dict:
+        args = ["-h", target]
+        tc = ToolCommand(tool=ToolType.NIKTO, args=args, description="Web server scan")
+        result = self.run(tc, target)
+        return self._result_to_dict(result)
+
+    def run_whatweb(self, target: str) -> dict:
+        args = [target]
+        tc = ToolCommand(tool=ToolType.WHATWEB, args=args, description="Technology detection")
+        result = self.run(tc, target)
+        return self._result_to_dict(result)
+
+    def run_sqlmap(self, target: str) -> dict:
+        args = ["-u", target, "--batch", "--level=1", "--risk=1"]
+        tc = ToolCommand(tool=ToolType.SQLMAP, args=args, description="SQL injection test")
+        result = self.run(tc, target)
+        return self._result_to_dict(result)
+
+    def run_gobuster(self, target: str) -> dict:
+        args = ["dir", "-u", target, "-w", "/usr/share/wordlists/dirb/common.txt"]
+        tc = ToolCommand(tool=ToolType.GOBUSTER, args=args, description="Directory brute-force")
+        result = self.run(tc, target)
+        return self._result_to_dict(result)
+
+    def run_amass(self, target: str) -> dict:
+        args = ["enum", "-d", target]
+        tc = ToolCommand(tool=ToolType.AMASS, args=args, description="Subdomain enumeration")
+        result = self.run(tc, target)
+        return self._result_to_dict(result)
+
+    def _result_to_dict(self, result: ScanResult) -> dict:
+        return {
+            "success": result.success,
+            "tool": result.tool,
+            "target": result.target,
+            "ports": [
+                {"port": p.port, "state": p.state, "service": p.service, "version": p.version}
+                for p in result.ports
+            ],
+            "vulnerabilities": [
+                {
+                    "name": v.name,
+                    "severity": v.severity,
+                    "port": v.port,
+                    "cve": v.cve,
+                    "cvss": v.cvss,
+                }
+                for v in result.vulnerabilities
+            ],
+            "summary": result.summary,
+            "error": result.error,
+        }

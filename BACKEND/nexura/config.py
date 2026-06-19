@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 BACKEND_DIR = Path(__file__).resolve().parent.parent
-BASE_DIR = BACKEND_DIR  # backward compat
+BASE_DIR = BACKEND_DIR
 load_dotenv(BACKEND_DIR / ".env")
 MODELS_DIR = PROJECT_ROOT / "LOCAL_AI_MODELS"
 REPORTS_DIR = BACKEND_DIR / "reports"
@@ -19,12 +19,8 @@ def ensure_dirs():
         os.makedirs(REPORTS_DIR, exist_ok=True)
         _dirs_initialized = True
 
-LLAMA_MODEL_PATH = os.getenv("NEXURA_MODEL", str(MODELS_DIR / "qwen2.5-7b-instruct-q4_k_m.gguf"))
-LLAMA_N_CTX = int(os.getenv("NEXURA_CTX_SIZE", "4096"))
-LLAMA_N_THREADS = int(os.getenv("NEXURA_THREADS", "4"))
-LLAMA_N_GPU_LAYERS = int(os.getenv("NEXURA_GPU_LAYERS", "0"))
-LLAMA_TEMP = float(os.getenv("NEXURA_TEMP", "0.7"))
-LLAMA_MAX_TOKENS = int(os.getenv("NEXURA_MAX_TOKENS", "4096"))
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 
 WEB_HOST = os.getenv("NEXURA_WEB_HOST", "0.0.0.0")
 WEB_PORT = int(os.getenv("NEXURA_WEB_PORT", "8080"))
@@ -33,8 +29,6 @@ TIMEOUT = int(os.getenv("NEXURA_TIMEOUT", "300"))
 
 SSL_VERIFY = os.getenv("NEXURA_SSL_VERIFY", "1") == "1"
 SOCKET_TIMEOUT = float(os.getenv("NEXURA_SOCKET_TIMEOUT", "2.0"))
-
-AI_TIMEOUT = int(os.getenv("NEXURA_AI_TIMEOUT", "120"))
 
 IS_PRODUCTION = os.getenv("NEXURA_PRODUCTION", "").lower() in ("1", "true", "yes")
 

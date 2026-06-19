@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from contextlib import asynccontextmanager
 import asyncio
@@ -35,6 +35,9 @@ from nexura.report.generator import ReportGenerator
 from nexura.runner import ScanRunner
 from nexura.scanners.network import NetworkScanner
 from nexura.tool_selector import ToolSelector
+
+# In-memory conversation store: session_id -> list of messages
+_chat_sessions: dict[str, list] = {}
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +128,7 @@ if _API_KEY:
     if _API_KEY == "change-me-to-a-random-secret-key":
         logger.critical("NEXURA_API_KEY default qiymat bilan ishlayapti! Uni o'zgartiring!")
     else:
-        logger.warning("API key configured. Server is running over HTTP — key is sent in cleartext. Set up HTTPS.")
+        logger.warning("API key configured. Server is running over HTTP вЂ” key is sent in cleartext. Set up HTTPS.")
 
 
 def _verify_token(request: Request):
@@ -181,6 +184,7 @@ class ChatRequest(BaseModel):
     message: str = Field(max_length=2000)
     target: str | None = Field(default=None, max_length=500)
     agentic: bool = False
+    session_id: str = Field(default="default", max_length=100)
 
 
 class QuickScanRequest(BaseModel):
@@ -211,7 +215,7 @@ async def _enrich_report_with_cms_cves(state, report, target: str) -> None:
         for cv in cve_results:
             if not any(v.cve == cv.cve_id for r in report.results for v in r.vulnerabilities):
                 report.results[0].vulnerabilities.append(Vulnerability(
-                    name=f"CVE: {cv.cve_id} — {cv.description[:100]}",
+                    name=f"CVE: {cv.cve_id} вЂ” {cv.description[:100]}",
                     severity=cv.severity,
                     cve=cv.cve_id,
                     cvss=cv.cvss_score,
@@ -311,7 +315,7 @@ async def quick_scan(req: QuickScanRequest, request: Request, _=Depends(_verify_
                     if cv.cve_id not in seen:
                         seen.add(cv.cve_id)
                         result.vulnerabilities.append(Vulnerability(
-                            name=f"CVE: {cv.cve_id} — {cv.description[:100]}",
+                            name=f"CVE: {cv.cve_id} вЂ” {cv.description[:100]}",
                             severity=cv.severity,
                             cve=cv.cve_id,
                             cvss=cv.cvss_score,
@@ -433,41 +437,6 @@ def _get_history_from_files() -> dict:
             continue
     return {"reports": reports}
 
-
-def detect_intent(message: str) -> str:
-    message_lower = message.lower()
-
-    scan_keywords = [
-        "tekshir", "skaner", "scan", "check", "audit",
-        "zaiflik", "vulnerability", "port", "nmap",
-        "nuclei", "nikto", "sqlmap", "gobuster", "amass",
-        "whatweb", "subdomain", "inject", "xss", "exploit"
-    ]
-
-    domain_pattern = r'([a-zA-Z0-9-]+\.[a-zA-Z]{2,})'
-    has_domain = bool(re.search(domain_pattern, message))
-
-    for keyword in scan_keywords:
-        if keyword in message_lower:
-            return "scan"
-
-    if has_domain and any(word in message_lower for word in
-       ["tekshir", "scan", "zaiflik", "port", "check"]):
-        return "scan"
-
-    cyber_keywords = [
-        "nima", "qanday", "tushuntir", "what", "how",
-        "explain", "sql injection", "xss", "csrf", "owasp",
-        "hacker", "penetration", "pentest", "firewall",
-        "encrypt", "decrypt", "malware", "phishing"
-    ]
-    for keyword in cyber_keywords:
-        if keyword in message_lower:
-            return "cyber_question"
-
-    return "chat"
-
-
 def _check_tools() -> dict:
     tools = ["nmap", "nuclei", "nikto", "sqlmap", "gobuster", "amass", "whatweb"]
     result = {}
@@ -494,53 +463,23 @@ async def list_reports(request: Request, _=Depends(_verify_token)):
 
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_token)):
-    state = request.app.state
-    message = req.message.strip()
-    intent = detect_intent(message)
+    engine = request.app.state.engine
+    if not engine.is_ready:
+        return {"response": "AI yordamchisi sozlanmagan. ANTHROPIC_API_KEY ni .env faylga qo'shing.", "scan_data": None}
 
-    if intent == "chat":
-        responses = {
-            "salom": "Salom! Men NEXURA AI yordamchisiman. Sayt zaifliklarini tekshirish, kiberxavfsizlik savollari yoki skanerlash buyruqlari bo'yicha yordam bera olaman. Qanday yordam kerak?",
-            "xayr": "Xayr! Yana zaiflik tekshirishga kelganingizda xizmatdaman.",
-            "rahmat": "Arzimaydi! Yana yordam kerak bo'lsa murojaat qiling.",
-            "yaxshimisan": "Yaxshi, rahmat! Sizga qanday yordam bera olaman?",
-        }
-        msg_lower = message.lower()
-        for key, response in responses.items():
-            if key in msg_lower:
-                return {"response": response, "intent": "chat", "scan_data": None}
-        return {"response": "Salom! Men NEXURA AI yordamchisiman. Masalan: 'example.com saytini tekshir' yoki 'SQL injection nima?' deb so'rang.", "intent": "chat", "scan_data": None}
+    # Get or create conversation history for this session
+    sid = req.session_id
+    if sid not in _chat_sessions:
+        _chat_sessions[sid] = []
 
-    if intent == "cyber_question":
-        if not state.engine.is_ready:
-            return {"response": "AI hozir offline. Terminal orqali ishlashingiz mumkin: nmap -F example.com", "intent": "chat", "scan_data": None}
-        system = ("Sen NEXURA kiberxavfsizlik AI yordamchisisisan. "
-                  "Foydalanuvchi savollariga o'zbek tilida aniq, "
-                  "qisqa va tushunarli javob ber. "
-                  "Skanerlash kerak bo'lsa ayt.")
-        try:
-            ai_response = await state.engine.ask_async(system, message, timeout=config.AI_TIMEOUT)
-            return {"response": ai_response, "intent": "cyber_question", "scan_data": None}
-        except Exception as e:
-            err = str(e)
-            if "timeout" in err.lower() or str(config.AI_TIMEOUT) in err:
-                return {"response": "AI hozir band, terminal orqali ishlashingiz mumkin: nmap -F example.com", "intent": "chat", "scan_data": None}
-            return {"response": f"AI modeldan javob olishda xatolik yuz berdi: {e}", "intent": "chat", "scan_data": None}
+    conv = _chat_sessions[sid]
 
-    # intent == "scan"
-    selector = _get_selector(request)
-    if not selector:
-        if not state.engine.is_ready:
-            return {"response": "AI yordamchisi yoqilmagan. Terminal orqali buyruq bering: nmap -F <target>", "intent": "chat", "scan_data": None}
-        selector = ToolSelector(state.engine)
-        state.selector = selector
-
-    # Extract target from message if not explicitly provided
+    # Extract target from message for convenience
     target = req.target
     if not target:
-        domain_match = re.search(r'([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}', message)
-        ip_match = re.search(r'\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b', message)
-        url_match = re.search(r'(https?://[^\s]+)', message)
+        url_match = re.search(r'(https?://[^\s]+)', req.message)
+        domain_match = re.search(r'([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}', req.message)
+        ip_match = re.search(r'\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b', req.message)
         if url_match:
             target = url_match.group(1)
         elif domain_match:
@@ -548,66 +487,22 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
         elif ip_match:
             target = ip_match.group(1)
 
-    plan = await selector.create_plan_async(message, target)
+    result = await engine.chat(req.message.strip(), conv)
+    _chat_sessions[sid] = result["history"]
 
-    if plan.target in (None, "unknown", ""):
-        return {
-            "response": "Target (sayt manzili) aniqlanmadi. Iltimos, tekshiriladigan saytning domen yoki IP manzilini kiriting. Masalan: example.com yoki 192.168.1.1",
-            "intent": "scan", "scan_data": None,
+    # Build scan_data if tools were used
+    scan_data = None
+    if result["tool_calls"]:
+        target_from_tools = result["tool_calls"][0].get("input", {}).get("target", target or "unknown")
+        scan_data = {
+            "target": target_from_tools,
+            "tools": result["tool_calls"],
+            "results": [],
         }
-
-    if not plan.tools:
-        return {
-            "response": f"**{plan.target}** bo'yicha skanerlash rejasi tuzilmadi. Sabab: {plan.reasoning}",
-            "intent": "scan", "scan_data": None,
-        }
-
-    report = state.reporter.create_report(plan.target, plan.intent)
-
-    if req.agentic and selector.engine.is_ready:
-        results = await selector.run_agentic_scan_async(message, plan.target, state.runner)
-        report.results = results
-    else:
-        for tc in plan.tools:
-            result = await state.runner.run_async(tc, plan.target)
-            report.results.append(result)
-
-    report.end_time = datetime.now()
-    report.status = "completed"
-
-    try:
-        tech_url = plan.target if "://" in plan.target else f"https://{plan.target}"
-        report.technologies = state.scanner.detect_technologies(tech_url)
-    except Exception as e:
-        logger.warning("Technology detection failed for %s: %s", plan.target, e, exc_info=True)
-
-    await _enrich_report_with_cms_cves(state, report, plan.target)
-
-    html_path = state.reporter.save(report, fmt="both")
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, state.history_db.save_session, report, report.technologies)
-
-    relative_report_html = f"/reports/{Path(html_path).name}" if html_path else None
-
-    ai_response = f"Men **{plan.target}** bo'yicha skanerlash rejasini tuzdim va quyidagi vositalarni ishga tushirdim:\n"
-    for tc in plan.tools:
-        ai_response += f"- **{tc.tool.value.upper()}**: {tc.description}\n"
-    ai_response += f"\n**Tahlil natijasi (Reasoning):** {plan.reasoning}\n\n"
-    total_vulns = sum(len(r.vulnerabilities) for r in report.results)
-    total_ports = sum(len(r.ports) for r in report.results)
-    ai_response += f"Skanerlash muvaffaqiyatli yakunlandi. Jami **{total_ports} ta ochiq port** va **{total_vulns} ta zaiflik** aniqlandi."
 
     return {
-        "response": ai_response,
-        "intent": "scan",
-        "scan_data": {
-            "id": report.id,
-            "target": report.target,
-            "intent": plan.intent,
-            "results": [r.model_dump(mode="json", exclude_none=True) for r in report.results],
-            "report_html": relative_report_html,
-            "technologies": report.technologies,
-        }
+        "response": result["response"],
+        "scan_data": scan_data,
     }
 
 

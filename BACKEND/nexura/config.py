@@ -19,8 +19,8 @@ def ensure_dirs():
         os.makedirs(REPORTS_DIR, exist_ok=True)
         _dirs_initialized = True
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
 
 WEB_HOST = os.getenv("NEXURA_WEB_HOST", "0.0.0.0")
 WEB_PORT = int(os.getenv("NEXURA_WEB_PORT", "8080"))

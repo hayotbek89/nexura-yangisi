@@ -465,7 +465,7 @@ async def list_reports(request: Request, _=Depends(_verify_token)):
 async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_token)):
     engine = request.app.state.engine
     if not engine.is_ready:
-        return {"response": "AI yordamchisi sozlanmagan. ANTHROPIC_API_KEY ni .env faylga qo'shing.", "scan_data": None}
+        return {"response": "AI yordamchisi sozlanmagan. GEMINI_API_KEY ni .env faylga qo'shing.", "scan_data": None}
 
     # Get or create conversation history for this session
     sid = req.session_id

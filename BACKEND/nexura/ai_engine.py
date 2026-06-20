@@ -43,7 +43,7 @@ def _make_tools() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "target": {"type": "string", "description": "Domen yoki IP manzil"},
-                        "fast": {"type": "boolean", "description": "Tez skanerlash", "default": True},
+                        "fast": {"type": "boolean", "description": "Tez skanerlash"},
                     },
                     "required": ["target"],
                 },
@@ -55,7 +55,7 @@ def _make_tools() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "target": {"type": "string", "description": "URL yoki domen"},
-                        "severity": {"type": "string", "description": "low,medium,high,critical", "default": "medium,high,critical"},
+                        "severity": {"type": "string", "description": "low,medium,high,critical"},
                     },
                     "required": ["target"],
                 },

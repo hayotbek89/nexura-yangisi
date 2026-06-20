@@ -75,7 +75,10 @@ export default function Settings() {
         padding: 16, marginBottom: 24,
         border: '1px solid var(--border)',
       }}>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>Backend API key</div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>Terminal kirish kaliti</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.4 }}>
+          Himoyalangan buyruqlar (terminal, skanerlash) uchun. AI (Gemini) kaliti emas — u faqat serverda .env da saqlanadi.
+        </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <input
             type="password"

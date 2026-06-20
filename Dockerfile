@@ -18,8 +18,7 @@ RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
 COPY BACKEND/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install --no-cache-dir \
-    llama-cpp-python
+RUN pip install --no-cache-dir google-generativeai
 
 # ---- Runtime ----
 FROM python:3.11-slim

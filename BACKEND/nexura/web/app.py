@@ -35,9 +35,11 @@ from nexura.report.generator import ReportGenerator
 from nexura.runner import ScanRunner
 from nexura.scanners.network import NetworkScanner
 from nexura.tool_selector import ToolSelector
+from nexura.verification import DomainVerification, extract_domain, is_private_target
 
 # In-memory conversation store: session_id -> list of messages
 _chat_sessions: dict[str, list] = {}
+_verifier = DomainVerification()
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +196,16 @@ class QuickScanRequest(BaseModel):
 class TerminalRequest(BaseModel):
     cmd: str = Field(max_length=1000)
 
+class VerifyRequest(BaseModel):
+    domain: str = Field(max_length=500)
+
+class VerifyCheckRequest(BaseModel):
+    domain: str = Field(max_length=500)
+
+class TosAcceptRequest(BaseModel):
+    user_identifier: str = Field(default="default", max_length=100)
+    tos_version: str = Field(default="1.0", max_length=20)
+
 
 def _get_engine(request: Request) -> AIEngine:
     return request.app.state.engine
@@ -236,16 +248,6 @@ async def index():
 @app.post("/api/scan")
 async def start_scan(req: ScanRequest, request: Request, _=Depends(_verify_token)):
     state = request.app.state
-    selector = _get_selector(request)
-    if not selector:
-        engine = state.engine
-        if not engine.is_ready:
-            return JSONResponse(
-                status_code=503,
-                content={"error": "AI Engine yoqilmagan. GGUF model faylini joylashtiring."},
-            )
-        selector = ToolSelector(engine)
-        state.selector = selector
 
     target = req.target
     if not target:
@@ -258,6 +260,20 @@ async def start_scan(req: ScanRequest, request: Request, _=Depends(_verify_token
             target = domain_match.group(0)
         elif ip_match:
             target = ip_match.group(1)
+
+    await verify_scan_permission(target, request)
+    await _log_scan_start(state, target or "unknown", request)
+
+    selector = _get_selector(request)
+    if not selector:
+        engine = state.engine
+        if not engine.is_ready:
+            return JSONResponse(
+                status_code=503,
+                content={"error": "AI Engine yoqilmagan. GGUF model faylini joylashtiring."},
+            )
+        selector = ToolSelector(engine)
+        state.selector = selector
 
     plan = await selector.create_plan_async(req.prompt, target)
 
@@ -289,6 +305,9 @@ async def start_scan(req: ScanRequest, request: Request, _=Depends(_verify_token
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, state.history_db.save_session, report, report.technologies)
 
+    total_vulns = sum(len(r.vulnerabilities) for r in report.results)
+    await _log_scan_end(state, plan.target, request, f"{total_vulns} vulns found")
+
     relative_report_html = f"/reports/{Path(html_path).name}" if html_path else None
     return {
         "id": report.id,
@@ -303,6 +322,8 @@ async def start_scan(req: ScanRequest, request: Request, _=Depends(_verify_token
 
 @app.post("/api/quick-scan")
 async def quick_scan(req: QuickScanRequest, request: Request, _=Depends(_verify_token)):
+    await verify_scan_permission(req.target, request)
+    await _log_scan_start(request.app.state, req.target, request)
     result = request.app.state.scanner.quick_scan(req.target)
 
     if result.ports:
@@ -494,16 +515,157 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
     scan_data = None
     if result["tool_calls"]:
         target_from_tools = result["tool_calls"][0].get("input", {}).get("target", target or "unknown")
+        try:
+            await verify_scan_permission(target_from_tools, request)
+        except HTTPException as e:
+            return {"response": e.detail["error"], "scan_data": None}
+        await _log_scan_start(request.app.state, target_from_tools, request)
         scan_data = {
             "target": target_from_tools,
             "tools": result["tool_calls"],
             "results": [],
         }
+        await _log_scan_end(request.app.state, target_from_tools, request, "AI agentic scan")
 
     return {
         "response": result["response"],
         "scan_data": scan_data,
     }
+
+
+# ---- Scan Permission Middleware ----
+
+async def verify_scan_permission(target: str | None, request: Request):
+    if not target:
+        return
+    domain = extract_domain(target)
+    user_id = "default"
+
+    # 1. ToS check
+    loop = asyncio.get_event_loop()
+    tos_ok = await loop.run_in_executor(None, request.app.state.history_db.is_tos_accepted, user_id)
+    if not tos_ok:
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "Avval foydalanish shartlarini qabul qiling", "code": "TOS_NOT_ACCEPTED"},
+        )
+
+    # 2. Private target / own domain — skip verification
+    if is_private_target(domain) or domain == "nexuraai.uz":
+        return
+
+    # 3. Domain verification check
+    verified = await loop.run_in_executor(None, request.app.state.history_db.is_domain_verified, domain)
+    if not verified:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Domen tasdiqlanmagan. Avval /api/verify/request orqali domeningizni tasdiqlang.",
+                "code": "DOMAIN_NOT_VERIFIED",
+            },
+        )
+
+
+async def _log_scan_start(state, target: str, request: Request, tools_used: str | None = None):
+    try:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None,
+            state.history_db.log_audit_event,
+            "default",
+            request.client.host if request.client else None,
+            target,
+            "scan_start",
+            tools_used,
+            None,
+            None,
+            None,
+        )
+    except Exception:
+        logger.warning("Audit log failed (non-blocking)")
+
+
+async def _log_scan_end(state, target: str, request: Request, result_summary: str | None = None):
+    try:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None,
+            state.history_db.log_audit_event,
+            "default",
+            request.client.host if request.client else None,
+            target,
+            "scan_complete",
+            None,
+            None,
+            None,
+            result_summary,
+        )
+    except Exception:
+        logger.warning("Audit log failed (non-blocking)")
+
+
+# ---- Domain Verification Endpoints ----
+
+@app.post("/api/verify/request")
+async def verify_request(req: VerifyRequest, request: Request, _=Depends(_verify_token)):
+    domain = extract_domain(req.domain)
+    if is_private_target(domain):
+        return JSONResponse(status_code=400, content={"error": "Localhost/private IP verification talab qilmaydi"})
+    token = _verifier.generate_token()
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, request.app.state.history_db.create_verification_request, domain, token)
+    return {
+        "domain": domain,
+        "token": token,
+        "instructions": f"Quyidagi TXT recordni domeningizga qo'shing: nexura-verify={token}",
+        "expires_in": "24 soat",
+    }
+
+
+@app.post("/api/verify/check")
+async def verify_check(req: VerifyCheckRequest, request: Request, _=Depends(_verify_token)):
+    domain = extract_domain(req.domain)
+    if is_private_target(domain):
+        return {"verified": True, "domain": domain, "skip": True}
+    loop = asyncio.get_event_loop()
+    token = await loop.run_in_executor(None, request.app.state.history_db.get_verification_token, domain)
+    if not token:
+        return JSONResponse(status_code=400, content={"error": "Bu domen uchun verification so'rovi topilmadi. Avval /api/verify/request ni chaqiring."})
+    verified = _verifier.check_txt_record(domain, token)
+    if verified:
+        await loop.run_in_executor(None, request.app.state.history_db.mark_domain_verified, domain)
+    return {"verified": verified, "domain": domain}
+
+
+# ---- ToS Endpoints ----
+
+@app.post("/api/tos/accept")
+async def tos_accept(req: TosAcceptRequest, request: Request, _=Depends(_verify_token)):
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(
+        None,
+        request.app.state.history_db.accept_tos,
+        req.user_identifier,
+        req.tos_version,
+        request.client.host if request.client else None,
+    )
+    return {"accepted": True, "version": req.tos_version}
+
+
+@app.get("/api/tos/status")
+async def tos_status(request: Request):
+    loop = asyncio.get_event_loop()
+    accepted = await loop.run_in_executor(None, request.app.state.history_db.is_tos_accepted, "default")
+    return {"accepted": accepted, "version": "1.0"}
+
+
+# ---- Audit Endpoint ----
+
+@app.get("/api/audit")
+async def get_audit_log(request: Request, limit: int = 100, _=Depends(_verify_token)):
+    loop = asyncio.get_event_loop()
+    entries = await loop.run_in_executor(None, request.app.state.history_db.get_audit_log, limit)
+    return {"entries": entries}
 
 
 # ---- n8n Webhook API ----
@@ -519,6 +681,9 @@ class WebhookScanRequest(BaseModel):
 @app.post("/api/webhook/scan")
 async def webhook_scan(req: WebhookScanRequest, request: Request, _=Depends(_verify_token)):
     state = request.app.state
+    await verify_scan_permission(req.target, request)
+    await _log_scan_start(state, req.target or req.prompt, request)
+
     selector = _get_selector(request)
     if not selector:
         engine = state.engine
@@ -551,6 +716,9 @@ async def webhook_scan(req: WebhookScanRequest, request: Request, _=Depends(_ver
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, state.history_db.save_session, report, report.technologies)
 
+    total_vulns = sum(len(r.vulnerabilities) for r in report.results)
+    await _log_scan_end(state, plan.target, request, f"{total_vulns} vulns found")
+
     return {
         "job_id": report.id,
         "target": report.target,
@@ -577,6 +745,9 @@ async def webhook_scan(req: WebhookScanRequest, request: Request, _=Depends(_ver
 @app.post("/api/webhook/scan/async")
 async def webhook_scan_async(req: WebhookScanRequest, request: Request, _=Depends(_verify_token)):
     state = request.app.state
+    await verify_scan_permission(req.target, request)
+    await _log_scan_start(state, req.target or req.prompt, request)
+
     selector = _get_selector(request)
     if not selector:
         engine = state.engine
@@ -602,6 +773,8 @@ async def webhook_scan_async(req: WebhookScanRequest, request: Request, _=Depend
         "error": None,
     }
 
+    client_ip = request.client.host if request.client else None
+
     async def run_job():
         try:
             report = state.reporter.create_report(plan.target, plan.intent)
@@ -620,6 +793,20 @@ async def webhook_scan_async(req: WebhookScanRequest, request: Request, _=Depend
             html_path = state.reporter.save(report, fmt="both")
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, state.history_db.save_session, report, report.technologies)
+
+            total_vulns = sum(len(r.vulnerabilities) for r in report.results)
+            await loop.run_in_executor(
+                None,
+                state.history_db.log_audit_event,
+                "default",
+                client_ip,
+                plan.target,
+                "scan_complete",
+                None,
+                None,
+                None,
+                f"{total_vulns} vulns found",
+            )
 
             _scan_jobs[job_id].update({
                 "status": "completed",

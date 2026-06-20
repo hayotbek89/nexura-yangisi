@@ -64,6 +64,37 @@ def _init_db(db_path: str):
                 FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS verified_domains (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                domain TEXT NOT NULL UNIQUE,
+                verification_token TEXT NOT NULL,
+                verified BOOLEAN DEFAULT 0,
+                verified_at TEXT,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                user_identifier TEXT,
+                ip_address TEXT,
+                target TEXT NOT NULL,
+                action TEXT NOT NULL,
+                tools_used TEXT,
+                verification_status TEXT,
+                tos_accepted BOOLEAN,
+                result_summary TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS tos_acceptance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_identifier TEXT NOT NULL UNIQUE,
+                accepted_at TEXT NOT NULL,
+                tos_version TEXT NOT NULL,
+                ip_address TEXT
+            );
+
             CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(scan_date);
             CREATE INDEX IF NOT EXISTS idx_vulns_session ON vulnerabilities(session_id);
             CREATE INDEX IF NOT EXISTS idx_ports_session ON ports(session_id);
@@ -290,6 +321,132 @@ class HistoryDB:
             except Exception:
                 pass
             logger.error("Failed to save AI analysis: %s", e)
+
+    # ---- Domain Verification ----
+
+    def create_verification_request(self, domain: str, token: str) -> None:
+        conn = self._get_conn()
+        try:
+            conn.execute("BEGIN")
+            conn.execute(
+                """INSERT OR REPLACE INTO verified_domains
+                   (domain, verification_token, verified, created_at, expires_at)
+                   VALUES (?, ?, 0, datetime('now'), datetime('now', '+24 hours'))""",
+                (domain, token),
+            )
+            conn.execute("COMMIT")
+        except Exception as e:
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
+            logger.error("Failed to create verification request: %s", e)
+
+    def mark_domain_verified(self, domain: str) -> None:
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                """UPDATE verified_domains SET verified = 1, verified_at = datetime('now')
+                   WHERE domain = ?""",
+                (domain,),
+            )
+        except Exception as e:
+            logger.error("Failed to mark domain verified: %s", e)
+
+    def is_domain_verified(self, domain: str) -> bool:
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                """SELECT verified FROM verified_domains
+                   WHERE domain = ? AND expires_at > datetime('now')""",
+                (domain,),
+            ).fetchone()
+            return row is not None and row["verified"] == 1
+        except Exception as e:
+            logger.error("Failed to check domain verification: %s", e)
+            return False
+
+    def get_verification_token(self, domain: str) -> str | None:
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                """SELECT verification_token FROM verified_domains WHERE domain = ?""",
+                (domain,),
+            ).fetchone()
+            return row["verification_token"] if row else None
+        except Exception as e:
+            logger.error("Failed to get verification token: %s", e)
+            return None
+
+    # ---- Audit Log ----
+
+    def log_audit_event(
+        self,
+        user_identifier: str | None,
+        ip_address: str | None,
+        target: str,
+        action: str,
+        tools_used: str | None = None,
+        verification_status: str | None = None,
+        tos_accepted: bool | None = None,
+        result_summary: str | None = None,
+    ) -> None:
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                """INSERT INTO audit_log
+                   (timestamp, user_identifier, ip_address, target, action,
+                    tools_used, verification_status, tos_accepted, result_summary)
+                   VALUES (datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (user_identifier, ip_address, target, action,
+                 tools_used, verification_status, tos_accepted, result_summary),
+            )
+        except Exception as e:
+            logger.error("Failed to log audit event: %s", e)
+
+    def get_audit_log(self, limit: int = 100) -> list[dict]:
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT * FROM audit_log ORDER BY id DESC LIMIT ?""",
+                (limit,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+        except Exception as e:
+            logger.error("Failed to get audit log: %s", e)
+            return []
+
+    # ---- ToS Acceptance ----
+
+    def accept_tos(self, user_identifier: str, tos_version: str, ip_address: str | None = None) -> None:
+        conn = self._get_conn()
+        try:
+            conn.execute("BEGIN")
+            conn.execute(
+                """INSERT OR REPLACE INTO tos_acceptance
+                   (user_identifier, accepted_at, tos_version, ip_address)
+                   VALUES (?, datetime('now'), ?, ?)""",
+                (user_identifier, tos_version, ip_address),
+            )
+            conn.execute("COMMIT")
+        except Exception as e:
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
+            logger.error("Failed to accept ToS: %s", e)
+
+    def is_tos_accepted(self, user_identifier: str) -> bool:
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM tos_acceptance WHERE user_identifier = ?",
+                (user_identifier,),
+            ).fetchone()
+            return row is not None
+        except Exception as e:
+            logger.error("Failed to check ToS acceptance: %s", e)
+            return False
 
     def get_stats(self) -> dict:
         conn = self._get_conn()

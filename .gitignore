@@ -18,4 +18,6 @@ nexura_scanner.iml
 # Runtime
 *.log
 *.db
+*.db-shm
+*.db-wal
 

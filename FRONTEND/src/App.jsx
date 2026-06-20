@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ScannerProvider } from './ScannerContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { useWindowSize } from './hooks/useWindowSize'
@@ -10,18 +10,35 @@ import Reports from './components/Reports'
 import Settings from './components/Settings'
 import BackgroundPattern from './components/BackgroundPattern'
 import AccessKeyGate from './components/AccessKeyGate'
+import TermsOfServiceModal from './components/TermsOfServiceModal'
 import './App.css'
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(() => !!localStorage.getItem('nexura_auth'))
+  const [tosAccepted, setTosAccepted] = useState(false)
+  const [tosChecked, setTosChecked] = useState(false)
   const [page, setPage] = useState('scanner')
   const [menuOpen, setMenuOpen] = useState(false)
   const winWidth = useWindowSize()
   const isMobile = winWidth < 768
 
+  useEffect(() => {
+    if (authenticated && !tosChecked) {
+      fetch('/api/tos/status')
+        .then(r => r.json())
+        .then(d => { setTosAccepted(d.accepted); setTosChecked(true) })
+        .catch(() => { setTosAccepted(false); setTosChecked(true) })
+    }
+  }, [authenticated, tosChecked])
+
   const handleAccess = () => {
     localStorage.setItem('nexura_auth', 'true')
     setAuthenticated(true)
+    setTosChecked(false)
+  }
+
+  const handleTosAccept = () => {
+    setTosAccepted(true)
   }
 
   const handleLogout = () => {
@@ -40,6 +57,9 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      {authenticated && tosChecked && !tosAccepted && (
+        <TermsOfServiceModal onAccept={handleTosAccept} />
+      )}
       <BackgroundPattern />
       <ScannerProvider>
         <ErrorBoundary>

@@ -19,8 +19,10 @@ def ensure_dirs():
         os.makedirs(REPORTS_DIR, exist_ok=True)
         _dirs_initialized = True
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
+WRN_MODEL_PATH = os.getenv("WRN_MODEL_PATH", "gguf_models/WhiteRabbitNeo_WhiteRabbitNeo-V3-7B-Q4_K_M.gguf")
+WRN_CTX_SIZE = int(os.getenv("WRN_CTX_SIZE", "4096"))
+WRN_GPU_LAYERS = int(os.getenv("WRN_GPU_LAYERS", "0"))
+WRN_TEMP = float(os.getenv("WRN_TEMP", "0.3"))
 
 WEB_HOST = os.getenv("NEXURA_WEB_HOST", "0.0.0.0")
 WEB_PORT = int(os.getenv("NEXURA_WEB_PORT", "8080"))

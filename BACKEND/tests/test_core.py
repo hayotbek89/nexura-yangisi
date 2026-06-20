@@ -86,7 +86,7 @@ class TestToolSelector:
         from nexura.tool_selector import ToolSelector
         selector = ToolSelector(AIEngine())
         plan = selector._fallback_plan("test scan", "example.com", "AI not available")
-        assert len(plan.tools) == 2
+        assert len(plan.tools) == 4
         assert plan.tools[0].tool == ToolType.NMAP
 
 

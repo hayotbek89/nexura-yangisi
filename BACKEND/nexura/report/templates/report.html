@@ -46,40 +46,40 @@
 <body>
 <header>
   <div class="container">
-    <h1>🛡️ Nexura Scan Report</h1>
+    <h1>🛡️ Nexura Skaner Hisoboti</h1>
     <div class="meta">
-      <strong>Target:</strong> {{ report.target }} &nbsp;|&nbsp;
-      <strong>Date:</strong> {{ report.start_time.strftime('%Y-%m-%d %H:%M:%S') }} &nbsp;|&nbsp;
-      <strong>Duration:</strong> 
+      <strong>Nishon:</strong> {{ report.target }} &nbsp;|&nbsp;
+      <strong>Sana:</strong> {{ report.start_time.strftime('%Y-%m-%d %H:%M:%S') }} &nbsp;|&nbsp;
+      <strong>Davomiylik:</strong> 
         {% if report.end_time %}
           {{ (report.end_time - report.start_time).total_seconds() | int // 60 }}m 
           {{ (report.end_time - report.start_time).total_seconds() | int % 60 }}s
         {% else %}N/A{% endif %}
     </div>
     {% if report.intent %}
-    <div class="meta" style="margin-top:4px"><strong>Intent:</strong> {{ report.intent }}</div>
+    <div class="meta" style="margin-top:4px"><strong>Maqsad:</strong> {{ report.intent }}</div>
     {% endif %}
   </div>
 </header>
 
 <div class="container">
   <div class="stats">
-    <div class="stat"><div class="num">{{ total_vulns }}</div><div class="label">Total Vulnerabilities</div></div>
-    <div class="stat severity-critical"><div class="num">{{ vulns_by_severity.CRITICAL }}</div><div class="label">Critical</div></div>
-    <div class="stat severity-high"><div class="num">{{ vulns_by_severity.HIGH }}</div><div class="label">High</div></div>
-    <div class="stat severity-medium"><div class="num">{{ vulns_by_severity.MEDIUM }}</div><div class="label">Medium</div></div>
-    <div class="stat severity-low"><div class="num">{{ vulns_by_severity.LOW }}</div><div class="label">Low</div></div>
-    <div class="stat"><div class="num">{{ total_ports }}</div><div class="label">Open Ports</div></div>
+    <div class="stat"><div class="num">{{ total_vulns }}</div><div class="label">Jami zaifliklar</div></div>
+    <div class="stat severity-critical"><div class="num">{{ vulns_by_severity.CRITICAL }}</div><div class="label">Kritik</div></div>
+    <div class="stat severity-high"><div class="num">{{ vulns_by_severity.HIGH }}</div><div class="label">Yuqori</div></div>
+    <div class="stat severity-medium"><div class="num">{{ vulns_by_severity.MEDIUM }}</div><div class="label">O'rta</div></div>
+    <div class="stat severity-low"><div class="num">{{ vulns_by_severity.LOW }}</div><div class="label">Past</div></div>
+    <div class="stat"><div class="num">{{ total_ports }}</div><div class="label">Ochiq portlar</div></div>
   </div>
 
   <div class="card">
-    <h2>📋 Scan Results</h2>
+    <h2>📋 Skaner natijalari</h2>
     {% for result in report.results %}
     <div class="tool-result">
       <div>
         <span class="tool-name">▶ {{ result.tool | upper }}</span>
         <span class="tool-status {% if result.success %}success{% else %}error{% endif %}">
-          {% if result.success %}✅ Success{% else %}❌ Failed{% endif %}
+          {% if result.success %}✅ Muvaffaqiyatli{% else %}❌ Muvaffaqiyatsiz{% endif %}
         </span>
       </div>
       {% if result.error %}<div style="color:#ff3333;margin-top:4px">{{ result.error }}</div>{% endif %}
@@ -95,7 +95,7 @@
 
       {% if technologies %}
       <div style="margin-top:8px">
-        <div style="color:#00d4ff;font-size:0.85em;font-weight:bold;margin-bottom:4px">Technologies:</div>
+        <div style="color:#00d4ff;font-size:0.85em;font-weight:bold;margin-bottom:4px">Texnologiyalar:</div>
         {% if technologies.cms %}<span class="port">{{ technologies.cms }}</span>{% endif %}
         {% if technologies.server %}<span class="port">{{ technologies.server }}</span>{% endif %}
         {% if technologies.language %}<span class="port">{{ technologies.language }}</span>{% endif %}
@@ -121,9 +121,9 @@
 
   {% if report.results and report.results[0].vulnerabilities %}
   <div class="card">
-    <h2>🔧 Recommendations</h2>
+    <h2>🔧 Tavsiyalar</h2>
     <ul style="padding-left:20px;color:#8892a4">
-      <li>Yuqori va critical zaifliklarni imkon qadar tezroq tuzating</li>
+      <li>Yuqori va kritik zaifliklarni imkon qadar tezroq tuzating</li>
       <li>Ochiq portlarni keraksiz bo'lsa yoping yoki firewall bilan cheklang</li>
       <li>Server va dasturiy ta'minotni doim yangilab turing</li>
       <li>Web application firewall (WAF) o'rnatishni ko'rib chiqing</li>
@@ -133,6 +133,6 @@
   {% endif %}
 </div>
 
-<footer>Nexura Scanner — AI-Powered Vulnerability Scanner</footer>
+<footer>Nexura Scanner — AI asosidagi xavfsizlik skaneri</footer>
 </body>
 </html>

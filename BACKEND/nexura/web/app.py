@@ -469,6 +469,18 @@ async def list_reports(request: Request, _=Depends(_verify_token)):
     return {"files": files}
 
 
+@app.delete("/api/reports/{filename}")
+async def delete_report(filename: str, request: Request, _=Depends(_verify_token)):
+    if not re.match(r'^[a-zA-Z0-9_.-]+\.html$', filename):
+        raise HTTPException(status_code=400, detail="Noto'g'ri fayl nomi")
+    reports_dir = config.REPORTS_DIR
+    filepath = reports_dir / filename
+    if filepath.exists() and filepath.is_file():
+        filepath.unlink()
+        return {"status": "deleted", "filename": filename}
+    return JSONResponse(status_code=404, content={"error": "Fayl topilmadi"})
+
+
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_token)):
     sid = req.session_id

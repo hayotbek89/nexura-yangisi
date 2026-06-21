@@ -88,6 +88,7 @@ const DownloadBtn = styled.button`
 
 export default function Reports() {
   const [files, setFiles] = useState([])
+  const [deleting, setDeleting] = useState(null)
 
   useEffect(() => {
     apiFetch('/api/reports')
@@ -95,6 +96,18 @@ export default function Reports() {
       .then(d => setFiles(d.files || []))
       .catch(() => setFiles([]))
   }, [])
+
+  const handleDelete = async (name) => {
+    if (!confirm(`"${name}" hisobotini o'chirishni xohlaysizmi?`)) return
+    setDeleting(name)
+    try {
+      const res = await apiFetch(`/api/reports/${encodeURIComponent(name)}`, { method: 'DELETE' })
+      if (res.ok) {
+        setFiles(prev => prev.filter(f => f.name !== name))
+      }
+    } catch (_) {}
+    setDeleting(null)
+  }
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -115,6 +128,16 @@ export default function Reports() {
                   {f.size} | {f.date}
                 </div>
               </div>
+              <button onClick={() => handleDelete(f.name)} disabled={deleting === f.name}
+                style={{
+                  background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+                  borderRadius: 6, color: '#ef4444', padding: '6px 10px', fontSize: 12, cursor: 'pointer',
+                  flexShrink: 0, transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.2)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}>
+                {deleting === f.name ? '...' : '✕ O\'chirish'}
+              </button>
               <a href={f.path} download target="_blank" rel="noopener noreferrer"
                 style={{ textDecoration: 'none', lineHeight: 0 }}>
                 <DownloadBtn className="Btn">

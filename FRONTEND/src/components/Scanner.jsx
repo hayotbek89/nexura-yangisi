@@ -35,22 +35,59 @@ const PanelWrapper = styled.div`
     overflow: hidden;
   `}
 `
-const RestoreButton = styled.button`
+const PanelsContainer = styled.div`
   display: flex;
+  gap: 16px;
+  width: 100%;
+  align-items: stretch;
+  flex-direction: ${props => props.$column ? 'column' : 'row'};
+`
+const Panel = styled.div`
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+`
+const Dock = styled.div`
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(15, 21, 37, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid #2761c3;
+  border-radius: 16px;
+  z-index: 100;
+  ${props => props.$empty && `display: none;`}
+`
+const DockItem = styled.button`
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: 4px;
+  padding: 8px 12px;
   background: rgba(39, 195, 159, 0.1);
   border: 1px solid #27c39f;
-  border-radius: 8px;
+  border-radius: 10px;
   color: #27c39f;
-  font-family: inherit;
-  font-size: 13px;
+  font-size: 11px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   &:hover {
+    transform: translateY(-4px) scale(1.05);
     background: rgba(39, 195, 159, 0.2);
+    box-shadow: 0 4px 12px rgba(39, 195, 159, 0.3);
   }
+  &:active {
+    transform: translateY(-2px) scale(0.98);
+  }
+`
+const DockIcon = styled.div`
+  font-size: 20px;
 `
 
 const StyledWrapper = styled.div`
@@ -625,7 +662,7 @@ export default function Scanner() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16, paddingBottom: 80 }}>
       {/* Title Header */}
       <div style={{ textAlign: 'center', marginBottom: 4 }}>
         <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 2 }}>
@@ -644,378 +681,407 @@ export default function Scanner() {
         flex: 1,
         minHeight: 'calc(100vh - 150px)',
       }}>
-        {/* LEFT COLUMN: AI Chat Assistant */}
-        {!chatMinimized ? (
-        <PanelWrapper $closing={chatClosing} style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'row',
-          background: 'var(--bg-card)',
-          borderRadius: 'var(--radius)',
-          border: '1px solid var(--border)',
-          overflow: 'hidden',
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-        }}>
-          {/* CHAT HISTORY SIDEBAR */}
-          <div style={{
-            width: showSidebar ? 220 : 0,
-            minWidth: showSidebar ? 220 : 0,
-            overflow: 'hidden',
-            background: 'var(--bg-input)',
-            borderRight: showSidebar ? '1px solid var(--border)' : 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            transition: 'width 0.2s, min-width 0.2s',
-          }}>
-            <div style={{
-              padding: 12,
-              borderBottom: '1px solid var(--border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 6,
-            }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
-                Chatlar
-              </span>
-              <button onClick={createNewSession} style={{
-                background: 'var(--primary)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 4,
-                padding: '4px 8px',
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}>
-                + Yangi
-              </button>
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
-              {chatSessions.length === 0 && (
-                <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
-                  Hozircha chatlar yo'q
-                </div>
-              )}
-              {chatSessions.map((s, i) => {
-                const isActive = s.session_id === chatSessionId
-                const label = s.first_msg
-                  ? s.first_msg.replace('T', ' ').slice(0, 16)
-                  : `Chat ${i + 1}`
-                return (
-                  <div key={s.session_id} onClick={() => switchSession(s.session_id)} style={{
-                    padding: '10px 12px',
-                    cursor: 'pointer',
-                    background: isActive ? 'rgba(24,95,165,0.15)' : 'transparent',
-                    borderLeft: isActive ? '3px solid var(--primary)' : '3px solid transparent',
-                    fontSize: 12,
-                    color: isActive ? 'var(--primary)' : 'var(--text)',
-                    fontWeight: isActive ? 600 : 400,
-                    transition: 'all 0.15s',
-                  }}>
-                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {label}
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                      {s.msg_count} xabar
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Chat Main Area */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            {/* Chat Header */}
-            <div style={{
-              background: 'var(--bg-input)',
-              padding: '12px 16px',
-              borderBottom: '1px solid var(--border)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span onClick={handleMinimizeChat} style={{ width: 12, height: 12, borderRadius: '50%', background: '#ee411a', cursor: 'pointer', display: 'inline-block', transition: 'transform 0.15s' }}
-                  onMouseEnter={e => e.target.style.transform = 'scale(1.3)'}
-                  onMouseLeave={e => e.target.style.transform = 'scale(1)'} />
-                <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#f5a623', display: 'inline-block' }} />
-                <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#27c39f', display: 'inline-block' }} />
-              </div>
-              <button onClick={() => setShowSidebar(s => !s)} style={{
-                background: 'none',
+        <PanelsContainer $column={winWidth < 1024}>
+          {/* LEFT COLUMN: AI Chat Assistant */}
+          {!chatMinimized && (
+            <Panel style={{ flex: terminalMinimized ? 2 : 1 }}>
+              <PanelWrapper $closing={chatClosing} style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'row',
+                background: 'var(--bg-card)',
+                borderRadius: 'var(--radius)',
                 border: '1px solid var(--border)',
-                borderRadius: 4,
-                padding: '4px 6px',
-                cursor: 'pointer',
-                color: 'var(--text-muted)',
-                fontSize: 14,
-                display: 'flex',
-                alignItems: 'center',
+                overflow: 'hidden',
+                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
               }}>
-                ☰
-              </button>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>NEXURA AI Assistant</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                  <span style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: modelLoaded ? '#22c55e' : '#f59e0b',
-                    display: 'inline-block'
-                  }} />
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    {modelLoaded ? 'Online' : 'Offline'}
-                  </span>
-                </div>
-              </div>
-              {scanning && (
-                <span style={{
-                  marginLeft: 'auto',
-                  fontSize: 12,
-                  color: 'var(--primary)',
-                  background: 'rgba(24,95,165,0.15)',
-                  padding: '4px 8px',
-                  borderRadius: 4,
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6
-                }}>
-                  <span style={{
-                    width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)',
-                    animation: 'pulse 1.5s infinite'
-                  }} />
-                  AI Skanerlashda...
-                </span>
-              )}
-            </div>
-
-          {/* Chat Messages Log */}
-          <div style={{
-            flex: 1,
-            padding: 16,
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 14,
-            maxHeight: 'calc(100vh - 300px)',
-          }}>
-            {chatLogs.map((log, idx) => (
-              <div key={idx} style={{
-                alignSelf: log.role === 'user' ? 'flex-end' : 'flex-start',
-                maxWidth: '85%',
-                display: 'flex',
-                flexDirection: 'column',
-              }}>
+                {/* CHAT HISTORY SIDEBAR */}
                 <div style={{
-                  background: log.role === 'user' ? 'var(--primary)' : 'var(--bg-input)',
-                  color: log.role === 'user' ? '#fff' : 'var(--text)',
-                  padding: '12px 16px',
-                  borderRadius: log.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                  fontSize: 14,
-                  lineHeight: '1.5',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                  width: showSidebar ? 220 : 0,
+                  minWidth: showSidebar ? 220 : 0,
+                  overflow: 'hidden',
+                  background: 'var(--bg-input)',
+                  borderRight: showSidebar ? '1px solid var(--border)' : 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'width 0.2s, min-width 0.2s',
                 }}>
-                  {renderMarkdown(log.content)}
-                  
-                  {/* Render Scan Results Card inside AI response */}
-                  {log.scanData && (
-                    <div style={{
-                      marginTop: 12,
-                      background: 'rgba(15,23,42,0.6)',
-                      borderRadius: 6,
-                      border: '1px solid var(--border)',
-                      padding: 12,
-                      fontSize: 13,
+                  <div style={{
+                    padding: 12,
+                    borderBottom: '1px solid var(--border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 6,
+                  }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                      Chatlar
+                    </span>
+                    <button onClick={createNewSession} style={{
+                      background: 'var(--primary)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 4,
+                      padding: '4px 8px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: 'pointer',
                     }}>
-                      <div style={{ fontWeight: 700, color: 'var(--primary)', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
-                        <span>📊 Skanerlash Tafsilotlari</span>
-                        <span style={{ color: 'var(--success)' }}>Yakunlandi</span>
+                      + Yangi
+                    </button>
+                  </div>
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+                    {chatSessions.length === 0 && (
+                      <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+                        Hozircha chatlar yo'q
                       </div>
-                      <div style={{ marginBottom: 4 }}><strong>Target:</strong> {log.scanData.target}</div>
-                      
-                      {/* Technologies display */}
-                      {log.scanData.technologies && (
-                        <div style={{ marginBottom: 8, fontSize: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          {log.scanData.technologies.cms && (
-                            <span style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--critical)', padding: '2px 6px', borderRadius: 4 }}>
-                              CMS: {log.scanData.technologies.cms}
-                            </span>
-                          )}
-                          {log.scanData.technologies.server && (
-                            <span style={{ background: 'rgba(59,130,246,0.2)', color: 'var(--primary)', padding: '2px 6px', borderRadius: 4 }}>
-                              Server: {log.scanData.technologies.server}
-                            </span>
-                          )}
+                    )}
+                    {chatSessions.map((s, i) => {
+                      const isActive = s.session_id === chatSessionId
+                      const label = s.first_msg
+                        ? s.first_msg.replace('T', ' ').slice(0, 16)
+                        : `Chat ${i + 1}`
+                      return (
+                        <div key={s.session_id} onClick={() => switchSession(s.session_id)} style={{
+                          padding: '10px 12px',
+                          cursor: 'pointer',
+                          background: isActive ? 'rgba(24,95,165,0.15)' : 'transparent',
+                          borderLeft: isActive ? '3px solid var(--primary)' : '3px solid transparent',
+                          fontSize: 12,
+                          color: isActive ? 'var(--primary)' : 'var(--text)',
+                          fontWeight: isActive ? 600 : 400,
+                          transition: 'all 0.15s',
+                        }}>
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {label}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                            {s.msg_count} xabar
+                          </div>
                         </div>
-                      )}
+                      )
+                    })}
+                  </div>
+                </div>
 
-                      {/* Tools run summary */}
-                      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 8 }}>
-                        <div style={{ fontWeight: 600, marginBottom: 4 }}>Ishlatilgan vositalar:</div>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          {log.scanData.results?.map((r, i) => (
-                            <div key={i} style={{
-                              background: 'var(--bg-card)',
-                              padding: '4px 8px',
-                              borderRadius: 4,
-                              fontSize: 11,
-                              border: '1px solid var(--border)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 6
-                            }}>
-                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: r.success ? 'var(--success)' : 'var(--danger)' }} />
-                              {r.tool?.toUpperCase()}
+                {/* Chat Main Area */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  {/* Chat Header */}
+                  <div style={{
+                    background: 'var(--bg-input)',
+                    padding: '12px 16px',
+                    borderBottom: '1px solid var(--border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span onClick={handleMinimizeChat} style={{ width: 12, height: 12, borderRadius: '50%', background: '#ee411a', cursor: 'pointer', display: 'inline-block', transition: 'transform 0.15s' }}
+                        onMouseEnter={e => e.target.style.transform = 'scale(1.3)'}
+                        onMouseLeave={e => e.target.style.transform = 'scale(1)'} />
+                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#f5a623', display: 'inline-block' }} />
+                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#27c39f', display: 'inline-block' }} />
+                    </div>
+                    <button onClick={() => setShowSidebar(s => !s)} style={{
+                      background: 'none',
+                      border: '1px solid var(--border)',
+                      borderRadius: 4,
+                      padding: '4px 6px',
+                      cursor: 'pointer',
+                      color: 'var(--text-muted)',
+                      fontSize: 14,
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}>
+                      ☰
+                    </button>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>NEXURA AI Assistant</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                        <span style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          background: modelLoaded ? '#22c55e' : '#f59e0b',
+                          display: 'inline-block'
+                        }} />
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {modelLoaded ? 'Online' : 'Offline'}
+                        </span>
+                      </div>
+                    </div>
+                    {scanning && (
+                      <span style={{
+                        marginLeft: 'auto',
+                        fontSize: 12,
+                        color: 'var(--primary)',
+                        background: 'rgba(24,95,165,0.15)',
+                        padding: '4px 8px',
+                        borderRadius: 4,
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6
+                      }}>
+                        <span style={{
+                          width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)',
+                          animation: 'pulse 1.5s infinite'
+                        }} />
+                        AI Skanerlashda...
+                      </span>
+                    )}
+                  </div>
+
+                {/* Chat Messages Log */}
+                <div style={{
+                  flex: 1,
+                  padding: 16,
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 14,
+                  maxHeight: 'calc(100vh - 300px)',
+                }}>
+                  {chatLogs.map((log, idx) => (
+                    <div key={idx} style={{
+                      alignSelf: log.role === 'user' ? 'flex-end' : 'flex-start',
+                      maxWidth: '85%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    }}>
+                      <div style={{
+                        background: log.role === 'user' ? 'var(--primary)' : 'var(--bg-input)',
+                        color: log.role === 'user' ? '#fff' : 'var(--text)',
+                        padding: '12px 16px',
+                        borderRadius: log.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                        fontSize: 14,
+                        lineHeight: '1.5',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                      }}>
+                        {renderMarkdown(log.content)}
+                        
+                        {/* Render Scan Results Card inside AI response */}
+                        {log.scanData && (
+                          <div style={{
+                            marginTop: 12,
+                            background: 'rgba(15,23,42,0.6)',
+                            borderRadius: 6,
+                            border: '1px solid var(--border)',
+                            padding: 12,
+                            fontSize: 13,
+                          }}>
+                            <div style={{ fontWeight: 700, color: 'var(--primary)', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                              <span>📊 Skanerlash Tafsilotlari</span>
+                              <span style={{ color: 'var(--success)' }}>Yakunlandi</span>
                             </div>
-                          ))}
-                        </div>
-                      </div>
+                            <div style={{ marginBottom: 4 }}><strong>Target:</strong> {log.scanData.target}</div>
+                            
+                            {/* Technologies display */}
+                            {log.scanData.technologies && (
+                              <div style={{ marginBottom: 8, fontSize: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                {log.scanData.technologies.cms && (
+                                  <span style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--critical)', padding: '2px 6px', borderRadius: 4 }}>
+                                    CMS: {log.scanData.technologies.cms}
+                                  </span>
+                                )}
+                                {log.scanData.technologies.server && (
+                                  <span style={{ background: 'rgba(59,130,246,0.2)', color: 'var(--primary)', padding: '2px 6px', borderRadius: 4 }}>
+                                    Server: {log.scanData.technologies.server}
+                                  </span>
+                                )}
+                              </div>
+                            )}
 
-                      {/* Download Link */}
-                      {log.scanData.report_html && (
-                        <div style={{ marginTop: 12, textAlign: 'center' }}>
-                          <a href={log.scanData.report_html} target="_blank" rel="noopener noreferrer"
-                            style={{
-                              display: 'block',
-                              background: 'var(--primary)',
-                              color: '#fff',
-                              textDecoration: 'none',
-                              padding: '8px 12px',
-                              borderRadius: 6,
-                              fontWeight: 700,
-                              fontSize: 12,
-                              transition: 'opacity 0.15s',
-                            }}
-                            onMouseOver={e => e.currentTarget.style.opacity = 0.9}
-                            onMouseOut={e => e.currentTarget.style.opacity = 1}
-                          >
-                            Batafsil HTML Hisobotni Ochish &rarr;
-                          </a>
-                        </div>
-                      )}
+                            {/* Tools run summary */}
+                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 8 }}>
+                              <div style={{ fontWeight: 600, marginBottom: 4 }}>Ishlatilgan vositalar:</div>
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                {log.scanData.results?.map((r, i) => (
+                                  <div key={i} style={{
+                                    background: 'var(--bg-card)',
+                                    padding: '4px 8px',
+                                    borderRadius: 4,
+                                    fontSize: 11,
+                                    border: '1px solid var(--border)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6
+                                  }}>
+                                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: r.success ? 'var(--success)' : 'var(--danger)' }} />
+                                    {r.tool?.toUpperCase()}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Download Link */}
+                            {log.scanData.report_html && (
+                              <div style={{ marginTop: 12, textAlign: 'center' }}>
+                                <a href={log.scanData.report_html} target="_blank" rel="noopener noreferrer"
+                                  style={{
+                                    display: 'block',
+                                    background: 'var(--primary)',
+                                    color: '#fff',
+                                    textDecoration: 'none',
+                                    padding: '8px 12px',
+                                    borderRadius: 6,
+                                    fontWeight: 700,
+                                    fontSize: 12,
+                                    transition: 'opacity 0.15s',
+                                  }}
+                                  onMouseOver={e => e.currentTarget.style.opacity = 0.9}
+                                  onMouseOut={e => e.currentTarget.style.opacity = 1}
+                                >
+                                  Batafsil HTML Hisobotni Ochish &rarr;
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <span style={{
+                        fontSize: 10,
+                        color: 'var(--text-muted)',
+                        alignSelf: log.role === 'user' ? 'flex-end' : 'flex-start',
+                        marginTop: 4,
+                        marginRight: log.role === 'user' ? 4 : 0,
+                        marginLeft: log.role === 'ai' ? 4 : 0,
+                      }}>
+                        {log.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  ))}
+                  
+                  {chatLoading && (
+                    <div style={{ alignSelf: 'flex-start', background: 'var(--bg-input)', padding: '12px 16px', borderRadius: '12px 12px 12px 2px', display: 'flex', gap: 4, alignItems: 'center' }}>
+                      <span className="dot" style={{ width: 8, height: 8, background: 'var(--text-muted)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both' }} />
+                      <span className="dot" style={{ width: 8, height: 8, background: 'var(--text-muted)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.2s' }} />
+                      <span className="dot" style={{ width: 8, height: 8, background: 'var(--text-muted)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.4s' }} />
+                      <style>{`
+                        @keyframes bounce {
+                          0%, 80%, 100% { transform: scale(0); }
+                          40% { transform: scale(1.0); }
+                        }
+                        @keyframes pulse {
+                          0%, 100% { opacity: 0.5; }
+                          50% { opacity: 1; }
+                        }
+                      `}</style>
                     </div>
                   )}
+                  <div ref={chatEndRef} />
                 </div>
-                <span style={{
-                  fontSize: 10,
-                  color: 'var(--text-muted)',
-                  alignSelf: log.role === 'user' ? 'flex-end' : 'flex-start',
-                  marginTop: 4,
-                  marginRight: log.role === 'user' ? 4 : 0,
-                  marginLeft: log.role === 'ai' ? 4 : 0,
+
+                {/* Chat Input Area */}
+                <form onSubmit={handleChatSubmit} style={{
+                  padding: 12,
+                  borderTop: '1px solid var(--border)',
+                  background: 'var(--bg-card)',
                 }}>
-                  {log.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-            ))}
-            
-            {chatLoading && (
-              <div style={{ alignSelf: 'flex-start', background: 'var(--bg-input)', padding: '12px 16px', borderRadius: '12px 12px 12px 2px', display: 'flex', gap: 4, alignItems: 'center' }}>
-                <span className="dot" style={{ width: 8, height: 8, background: 'var(--text-muted)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both' }} />
-                <span className="dot" style={{ width: 8, height: 8, background: 'var(--text-muted)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.2s' }} />
-                <span className="dot" style={{ width: 8, height: 8, background: 'var(--text-muted)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.4s' }} />
-                <style>{`
-                  @keyframes bounce {
-                    0%, 80%, 100% { transform: scale(0); }
-                    40% { transform: scale(1.0); }
-                  }
-                  @keyframes pulse {
-                    0%, 100% { opacity: 0.5; }
-                    50% { opacity: 1; }
-                  }
-                `}</style>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
+                  <StyledWrapper>
+                    <div className="pb-ai-input-wrap">
+                      <input
+                        type="text"
+                        className="pb-ai-input"
+                        placeholder="Buyruq yozing..."
+                        value={chatInput}
+                        onChange={e => setChatInput(e.target.value)}
+                        disabled={chatLoading}
+                      />
+                      <button className="pb-ai-input-btn" type="submit" disabled={chatLoading || !chatInput.trim()}>
+                        <span>Yuborish</span>
+                        <span className="pb-ai-sparkle">✦</span>
+                      </button>
+                    </div>
+                  </StyledWrapper>
+                </form>
+              </div>{/* End Chat Main Area */}
+              </PanelWrapper>
+            </Panel>
+          )}
 
-          {/* Chat Input Area */}
-          <form onSubmit={handleChatSubmit} style={{
-            padding: 12,
-            borderTop: '1px solid var(--border)',
-            background: 'var(--bg-card)',
-          }}>
-            <StyledWrapper>
-              <div className="pb-ai-input-wrap">
-                <input
-                  type="text"
-                  className="pb-ai-input"
-                  placeholder="Buyruq yozing..."
-                  value={chatInput}
-                  onChange={e => setChatInput(e.target.value)}
-                  disabled={chatLoading}
-                />
-                <button className="pb-ai-input-btn" type="submit" disabled={chatLoading || !chatInput.trim()}>
-                  <span>Yuborish</span>
-                  <span className="pb-ai-sparkle">✦</span>
-                </button>
-              </div>
-            </StyledWrapper>
-          </form>
-        </div>{/* End Chat Main Area */}
-        </PanelWrapper>
-        ) : (
-          <RestoreButton onClick={handleRestoreChat}>
-            <span>💬</span> AI Chat'ni ochish
-          </RestoreButton>
-        )}
+          {/* RIGHT COLUMN: Terminal */}
+          {!terminalMinimized && (
+            <Panel style={{ flex: chatMinimized ? 2 : 1 }}>
+              <PanelWrapper $closing={terminalClosing} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <TerminalBox>
+                <TerminalToolbar>
+                  <Buttons>
+                    <Dot $color="#ee411a" onClick={handleMinimizeTerminal} />
+                    <Dot />
+                    <Dot />
+                  </Buttons>
+                  <TabUser>00Kubi@admin: ~</TabUser>
+                  <AddTab>+</AddTab>
+                </TerminalToolbar>
+                <TerminalBody>
+                  <Prompt>
+                    <UserSpan>00Kubi@admin:</UserSpan>
+                    <LocationSpan>~</LocationSpan>
+                    <BlingSpan>$</BlingSpan>
+                    <Cursor />
+                  </Prompt>
+                  <OutputArea>
+                    {terminalLogs.length === 0 && !terminalLoading && (
+                      <OutputLine $log="">Welcome to NEXURA Security Terminal</OutputLine>
+                    )}
+                    {terminalLogs.map((log, idx) => (
+                      <OutputLine key={idx} $log={log}>{log}</OutputLine>
+                    ))}
+                    {terminalLoading && (
+                      <OutputLine $log="">Buyruq bajarilmoqda, kuting...</OutputLine>
+                    )}
+                    <div ref={terminalEndRef} />
+                  </OutputArea>
+                  <InputRow>
+                    <form onSubmit={handleTerminalSubmit}>
+                      <TerminalInput2
+                        value={terminalInput}
+                        onChange={e => setTerminalInput(e.target.value)}
+                        placeholder="nmap -F target.com"
+                        disabled={terminalLoading}
+                        autoFocus
+                      />
+                    </form>
+                  </InputRow>
+                </TerminalBody>
+              </TerminalBox>
+              </PanelWrapper>
+            </Panel>
+          )}
 
-        {/* RIGHT COLUMN: Terminal */}
-        {!terminalMinimized ? (
-        <PanelWrapper $closing={terminalClosing} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <TerminalBox>
-          <TerminalToolbar>
-            <Buttons>
-              <Dot $color="#ee411a" onClick={handleMinimizeTerminal} />
-              <Dot />
-              <Dot />
-            </Buttons>
-            <TabUser>00Kubi@admin: ~</TabUser>
-            <AddTab>+</AddTab>
-          </TerminalToolbar>
-          <TerminalBody>
-            <Prompt>
-              <UserSpan>00Kubi@admin:</UserSpan>
-              <LocationSpan>~</LocationSpan>
-              <BlingSpan>$</BlingSpan>
-              <Cursor />
-            </Prompt>
-            <OutputArea>
-              {terminalLogs.length === 0 && !terminalLoading && (
-                <OutputLine $log="">Welcome to NEXURA Security Terminal</OutputLine>
-              )}
-              {terminalLogs.map((log, idx) => (
-                <OutputLine key={idx} $log={log}>{log}</OutputLine>
-              ))}
-              {terminalLoading && (
-                <OutputLine $log="">Buyruq bajarilmoqda, kuting...</OutputLine>
-              )}
-              <div ref={terminalEndRef} />
-            </OutputArea>
-            <InputRow>
-              <form onSubmit={handleTerminalSubmit}>
-                <TerminalInput2
-                  value={terminalInput}
-                  onChange={e => setTerminalInput(e.target.value)}
-                  placeholder="nmap -F target.com"
-                  disabled={terminalLoading}
-                  autoFocus
-                />
-              </form>
-            </InputRow>
-          </TerminalBody>
-        </TerminalBox>
-        </PanelWrapper>
-        ) : (
-          <RestoreButton onClick={handleRestoreTerminal}>
-            <span>⌨</span> Terminalni ochish
-          </RestoreButton>
-        )}
+          {/* Both panels closed: show placeholder */}
+          {chatMinimized && terminalMinimized && (
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-muted)',
+              fontSize: 14,
+              opacity: 0.6,
+            }}>
+              Barcha panellar yopiq — pastdagi dock'dan oching
+            </div>
+          )}
+        </PanelsContainer>
       </div>
+
+      {/* macOS-style Dock */}
+      <Dock $empty={!chatMinimized && !terminalMinimized}>
+        {chatMinimized && (
+          <DockItem onClick={handleRestoreChat}>
+            <DockIcon>💬</DockIcon>
+            <span>AI Chat</span>
+          </DockItem>
+        )}
+        {terminalMinimized && (
+          <DockItem onClick={handleRestoreTerminal}>
+            <DockIcon>⌨</DockIcon>
+            <span>Terminal</span>
+          </DockItem>
+        )}
+      </Dock>
     </div>
   )
 }

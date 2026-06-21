@@ -7,8 +7,6 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from llama_cpp import Llama
-
 from nexura import config
 
 logger = logging.getLogger(__name__)
@@ -263,6 +261,8 @@ class AIEngine:
             logger.warning("Model fayli topilmadi: %s", self._model_path)
             return
         try:
+            from llama_cpp import Llama
+
             self._llm = Llama(
                 model_path=str(self._model_path),
                 n_ctx=config.WRN_CTX_SIZE,
@@ -275,7 +275,7 @@ class AIEngine:
             logger.info("WhiteRabbitNeo modeli yuklandi: %s", self._model_path)
         except Exception as e:
             self._ready = False
-            logger.error("Model yuklashda xato: %s", e, exc_info=True)
+            logger.warning("Model yuklashda xato (AI mavjud emas): %s", e)
 
     def _build_messages(self, user_message: str, history: list | None) -> list[dict]:
         messages = [{"role": "system", "content": _full_system_prompt()}]

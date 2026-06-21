@@ -193,6 +193,10 @@ class QuickScanRequest(BaseModel):
 class TerminalRequest(BaseModel):
     cmd: str = Field(max_length=1000)
 
+class ScanSelectRequest(BaseModel):
+    target: str = Field(min_length=1, max_length=255)
+    tool: str = Field(min_length=1, max_length=50)
+
 class VerifyRequest(BaseModel):
     domain: str = Field(max_length=500)
 
@@ -451,6 +455,109 @@ def _check_tools() -> dict:
     for t in tools:
         result[t] = {"available": config.is_tool_available(t)}
     return result
+
+
+TOOLS_META = [
+    {"name": "nmap",     "label": "Nmap",     "description": "Port skanerlash va xizmatlarni aniqlash"},
+    {"name": "nuclei",   "label": "Nuclei",   "description": "Zaiflik skaneri (CVE asosida)"},
+    {"name": "nikto",    "label": "Nikto",    "description": "Web server zaifliklarini tekshirish"},
+    {"name": "sqlmap",   "label": "SQLMap",   "description": "SQL injection zaifliklarini aniqlash"},
+    {"name": "gobuster", "label": "Gobuster", "description": "Katalog va fayllarni topish"},
+    {"name": "whatweb",  "label": "WhatWeb",  "description": "Texnologiyalarni aniqlash"},
+    {"name": "amass",    "label": "Amass",    "description": "Subdomain va domen ma'lumotlarini yig'ish"},
+]
+
+TOOL_TEMPLATES = {
+    "nmap":     "nmap -sV -sC -O -T4 {target}",
+    "nuclei":   "nuclei -u {target} -severity low,medium,high,critical",
+    "nikto":    "nikto -h {target}",
+    "sqlmap":   "sqlmap -u {target} --batch --random-agent",
+    "gobuster": "gobuster dir -u {target} -w /usr/share/wordlists/dirb/common.txt -t 50",
+    "whatweb":  "whatweb {target}",
+    "amass":    "amass enum -d {target}",
+}
+
+@app.get("/api/tools")
+async def list_tools(_=Depends(_verify_token)):
+    result = []
+    for t in TOOLS_META:
+        info = dict(t)
+        info["available"] = config.is_tool_available(t["name"])
+        result.append(info)
+    return {"tools": result}
+
+
+@app.post("/api/scan/select")
+async def scan_with_selected_tool(req: ScanSelectRequest, request: Request, _=Depends(_verify_token)):
+    tool = req.tool.strip().lower()
+    target = req.target.strip()
+    
+    if not config.is_tool_available(tool):
+        return JSONResponse(status_code=400, content={"error": f"'{tool}' dasturi serverda topilmadi"})
+    
+    # Generate command via n8n with fallback to template
+    command = None
+    n8n_error = None
+    try:
+        prompt = (
+            f"Foydalanuvchi '{target}' manzilini '{tool}' vositasi bilan tekshirmoqchi. "
+            f"Aynan shu vosita uchun to'g'ri terminal buyrug'ini yoz. "
+            f"Javobda FAQAT buyruq matni bo'lsin, boshqa hech qanday matn, tushuntirish yoki belgi bo'lmasin."
+        )
+        n8n_result = await send_to_n8n(prompt)
+        resp = n8n_result.get("response", "").strip().strip("`").strip()
+        if resp and len(resp) > 5 and not resp.startswith("Kechirasiz") and not resp.startswith("Xatolik"):
+            command = resp
+    except Exception as e:
+        n8n_error = str(e)
+    
+    if not command:
+        template = TOOL_TEMPLATES.get(tool)
+        if template:
+            command = template.format(target=target)
+    
+    if not command:
+        return JSONResponse(status_code=500, content={"error": "Buyruq yaratib bo'lmadi"})
+    
+    # Execute the command (reuse terminal logic)
+    try:
+        cmd_args = shlex.split(command)
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": f"Noto'g'ri buyruq: {e}"})
+    
+    binary = cmd_args[0]
+    binary_clean = binary.lower().lstrip(".").rstrip(".exe")
+    
+    if binary_clean not in ALLOWED_TERMINAL_COMMANDS:
+        return JSONResponse(status_code=400, content={"error": f"'{binary}' ruxsat etilmagan buyruq"})
+    
+    binary_path = config.TOOL_PATHS.get(binary_clean) or shutil.which(binary)
+    if not binary_path:
+        return JSONResponse(status_code=400, content={"error": f"'{binary}' serverda topilmadi"})
+    
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            binary_path, *cmd_args[1:],
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(config.BASE_DIR),
+            env=config.get_env(),
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=config.TIMEOUT)
+    except asyncio.TimeoutError:
+        proc.kill()
+        return {"command": command, "output": "", "error_log": "Buyruq vaqt chegarasidan oshdi", "code": -1, "generated_by": "n8n" if not n8n_error else "template"}
+    
+    output = stdout.decode("utf-8", errors="replace").strip()
+    error_log = stderr.decode("utf-8", errors="replace").strip()
+    
+    return {
+        "command": command,
+        "output": output,
+        "error_log": error_log,
+        "code": proc.returncode,
+        "generated_by": "n8n" if not n8n_error else "template",
+    }
 
 
 @app.get("/api/reports")
@@ -876,16 +983,37 @@ async def run_terminal(req: TerminalRequest, request: Request, _=Depends(_verify
     if not cmd:
         return {"output": "", "error": "Bo'sh buyruq", "code": -1}
 
-    try:
-        cmd_args = shlex.split(cmd)
-    except Exception as e:
-        return {"output": "", "error": f"Buyruq formatida xatolik: {e}", "code": -1}
-
-    if not cmd_args:
-        return {"output": "", "error": "Bo'sh buyruq", "code": -1}
-
-    binary = cmd_args[0]
-    binary_clean = binary.lower().lstrip(".").rstrip(".exe")
+    # Option C: /scan <tool> <target> handler
+    if cmd.lower().startswith("/scan "):
+        parts = cmd.split(maxsplit=2)
+        if len(parts) < 3:
+            return {"output": "", "error": "/scan <vosita> <nishon> — masalan: /scan nmap example.com", "code": -1}
+        scan_tool = parts[1].strip().lower()
+        scan_target = parts[2].strip()
+        if not config.is_tool_available(scan_tool):
+            return {"output": "", "error": f"'{scan_tool}' dasturi serverda mavjud emas", "code": 1}
+        template = TOOL_TEMPLATES.get(scan_tool)
+        if not template:
+            return {"output": "", "error": f"'{scan_tool}' uchun buyruq shabloni yo'q", "code": 1}
+        cmd = template.format(target=scan_target)
+        # Re-split with the new command
+        try:
+            cmd_args = shlex.split(cmd)
+        except Exception as e:
+            return {"output": "", "error": f"Buyruq formatida xatolik: {e}", "code": -1}
+        if not cmd_args:
+            return {"output": "", "error": "Bo'sh buyruq", "code": -1}
+        binary = cmd_args[0]
+        binary_clean = binary.lower().lstrip(".").rstrip(".exe")
+    else:
+        try:
+            cmd_args = shlex.split(cmd)
+        except Exception as e:
+            return {"output": "", "error": f"Buyruq formatida xatolik: {e}", "code": -1}
+        if not cmd_args:
+            return {"output": "", "error": "Bo'sh buyruq", "code": -1}
+        binary = cmd_args[0]
+        binary_clean = binary.lower().lstrip(".").rstrip(".exe")
     
     if binary_clean not in ALLOWED_TERMINAL_COMMANDS:
         return {

@@ -442,6 +442,53 @@ export default function Scanner() {
     return 1 + (1 - distance / maxDistance) * 0.4
   }
   
+  // QuickScan (Option B)
+  const [qsTarget, setQsTarget] = useState('')
+  const [qsTool, setQsTool] = useState('nmap')
+  const [availableTools, setAvailableTools] = useState([])
+  const [qsLoading, setQsLoading] = useState(false)
+  const [showQuickScan, setShowQuickScan] = useState(false)
+
+  // Chat tool selection (Option A)
+  const [pendingTarget, setPendingTarget] = useState(null)
+
+  useEffect(() => {
+    apiFetch('/api/tools').then(r => r.json()).then(d => {
+      setAvailableTools((d.tools || []).filter(t => t.available))
+    }).catch(() => {})
+  }, [])
+
+  const runScanWithTool = async (target, tool) => {
+    setQsLoading(true)
+    setPendingTarget(null)
+    setTerminalLogs(prev => [...prev, `[NEXURA] ${tool.toUpperCase()} bilan ${target} skanerlanmoqda...`])
+    try {
+      const res = await apiFetch('/api/scan/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target, tool }),
+      })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Xatolik')
+      }
+      const data = await res.json()
+      setTerminalLogs(prev => [...prev, `[NEXURA] Buyruq: ${data.command}`])
+      if (data.output) setTerminalLogs(prev => [...prev, data.output])
+      if (data.error_log) setTerminalLogs(prev => [...prev, `[STDERR]: ${data.error_log}`])
+      if (data.code !== 0 && !data.output) {
+        setTerminalLogs(prev => [...prev, `Exit code: ${data.code}`])
+      }
+      setTerminalLogs(prev => [...prev, `[NEXURA] ${tool.toUpperCase()} skanerlash yakunlandi`])
+    } catch (err) {
+      setTerminalLogs(prev => [...prev, `[ERROR]: ${err.message}`])
+    }
+    setQsLoading(false)
+  }
+
+  // Detect domain/IP/URL pattern for Option A
+  const TARGET_RE = /([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|https?:\/\/[^\s]+/
+
   // Terminal States
   const [terminalInput, setTerminalInput] = useState('')
 
@@ -571,7 +618,15 @@ export default function Scanner() {
       setChatSessionId(sid)
     }
 
-    setChatLogs(prev => [...prev, { role: 'user', content: userMsg, timestamp: new Date() }])
+      setChatLogs(prev => [...prev, { role: 'user', content: userMsg, timestamp: new Date() }])
+
+    // Option A: detect target in user message → show tool selection
+    const matchTarget = userMsg.match(TARGET_RE)
+    if (matchTarget) {
+      setPendingTarget(matchTarget[0])
+    } else {
+      setPendingTarget(null)
+    }
 
     if (modelLoaded === false) {
       setChatLogs(prev => [...prev, {
@@ -706,6 +761,48 @@ export default function Scanner() {
         <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
           AI Kiberxavfsizlik yordamchisi va interaktiv terminal muhiti
         </p>
+      </div>
+
+      {/* Option B: QuickScan Panel */}
+      <div style={{
+        background: 'var(--bg-card)', borderRadius: 'var(--radius)', border: '1px solid var(--border)',
+        overflow: 'hidden', marginBottom: showQuickScan ? 0 : 0,
+      }}>
+        <div onClick={() => setShowQuickScan(!showQuickScan)} style={{
+          padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+          background: 'var(--bg-input)', userSelect: 'none',
+        }}>
+          <span style={{ fontSize: 16 }}>{showQuickScan ? '▾' : '▸'}</span>
+          <span style={{ fontWeight: 600, fontSize: 13 }}>⚡ Tezkor skanerlash</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>— domen/IP kiriting va vositani tanlang</span>
+        </div>
+        {showQuickScan && (
+          <div style={{ padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input type="text" value={qsTarget} onChange={e => setQsTarget(e.target.value)}
+              placeholder="example.com yoki 192.168.1.1"
+              style={{
+                flex: 1, minWidth: 200, padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)',
+                borderRadius: 6, color: 'var(--text)', fontSize: 13, outline: 'none',
+              }} />
+            <select value={qsTool} onChange={e => setQsTool(e.target.value)}
+              style={{
+                padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)',
+                borderRadius: 6, color: 'var(--text)', fontSize: 13, cursor: 'pointer', outline: 'none',
+              }}>
+              {availableTools.map(t => (
+                <option key={t.name} value={t.name}>{t.label} — {t.description}</option>
+              ))}
+            </select>
+            <button onClick={() => runScanWithTool(qsTarget.trim(), qsTool)} disabled={qsLoading || !qsTarget.trim()}
+              style={{
+                padding: '8px 20px', background: qsLoading ? 'var(--text-muted)' : 'var(--primary)',
+                color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600,
+                cursor: qsLoading ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
+              }}>
+              {qsLoading ? 'Skanerlanmoqda...' : 'Ishga tushirish'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Split Grid */}
@@ -1031,6 +1128,37 @@ export default function Scanner() {
                     </div>
                   </StyledWrapper>
                 </form>
+                {/* Option A: Tool selection buttons */}
+                {pendingTarget && availableTools.length > 0 && (
+                  <div style={{
+                    padding: '8px 12px', borderTop: '1px solid var(--border)',
+                    background: 'rgba(39,195,159,0.05)',
+                  }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
+                      {pendingTarget} — qaysi vosita bilan skanerlaymiz?
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {availableTools.map(t => (
+                        <button key={t.name} onClick={() => { runScanWithTool(pendingTarget, t.name); setShowQuickScan(false) }}
+                          style={{
+                            padding: '6px 12px', background: 'rgba(24,95,165,0.15)', border: '1px solid var(--primary)',
+                            borderRadius: 6, color: 'var(--primary)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(24,95,165,0.3)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'rgba(24,95,165,0.15)'}>
+                          {t.label}
+                        </button>
+                      ))}
+                      <button onClick={() => setPendingTarget(null)}
+                        style={{
+                          padding: '6px 12px', background: 'transparent', border: '1px solid var(--border)',
+                          borderRadius: 6, color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer',
+                        }}>
+                        Bekor qilish
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>{/* End Chat Main Area */}
               </PanelWrapper>
             </Panel>

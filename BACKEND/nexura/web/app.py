@@ -205,7 +205,7 @@ class TosAcceptRequest(BaseModel):
 
 
 def _get_selector(request: Request) -> ToolSelector | None:
-    return request.app.state.selector
+    return getattr(request.app.state, "selector", None)
 
 
 async def _enrich_report_with_cms_cves(state, report, target: str) -> None:

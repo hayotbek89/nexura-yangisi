@@ -24,6 +24,9 @@ WRN_CTX_SIZE = int(os.getenv("WRN_CTX_SIZE", "4096"))
 WRN_GPU_LAYERS = int(os.getenv("WRN_GPU_LAYERS", "0"))
 WRN_TEMP = float(os.getenv("WRN_TEMP", "0.3"))
 
+N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "")
+N8N_TIMEOUT = int(os.getenv("N8N_TIMEOUT", "120"))
+
 WEB_HOST = os.getenv("NEXURA_WEB_HOST", "0.0.0.0")
 WEB_PORT = int(os.getenv("NEXURA_WEB_PORT", "8080"))
 

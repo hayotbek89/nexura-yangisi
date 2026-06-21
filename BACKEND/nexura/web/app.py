@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 from nexura import config
 from nexura.ai_engine import AIEngine
 from nexura.cve_lookup import CVELookup
+from nexura.n8n_client import send_to_n8n
 from nexura.history_db import HistoryDB
 from nexura.models.schemas import ScanResult, Vulnerability
 from nexura.report.generator import ReportGenerator
@@ -484,10 +485,6 @@ async def list_reports(request: Request, _=Depends(_verify_token)):
 
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_token)):
-    engine = request.app.state.engine
-    if not engine.is_ready:
-        return {"response": "AI yordamchisi sozlanmagan. WRN_MODEL_PATH ni tekshiring yoki model faylini joylashtiring.", "scan_data": None}
-
     # Get or create conversation history for this session
     sid = req.session_id
     if sid not in _chat_sessions:
@@ -508,28 +505,20 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
         elif ip_match:
             target = ip_match.group(1)
 
-    result = await engine.chat(req.message.strip(), conv)
-    _chat_sessions[sid] = result["history"]
+    # Send to n8n Claude AI Agent
+    n8n_result = await send_to_n8n(req.message.strip())
 
-    # Build scan_data if tools were used
-    scan_data = None
-    if result["tool_calls"]:
-        target_from_tools = result["tool_calls"][0].get("input", {}).get("target", target or "unknown")
-        try:
-            await verify_scan_permission(target_from_tools, request)
-        except HTTPException as e:
-            return {"response": e.detail["error"], "scan_data": None}
-        await _log_scan_start(request.app.state, target_from_tools, request)
-        scan_data = {
-            "target": target_from_tools,
-            "tools": result["tool_calls"],
-            "results": [],
-        }
-        await _log_scan_end(request.app.state, target_from_tools, request, "AI agentic scan")
+    # Build minimal history (last exchange)
+    conv.append({"role": "user", "parts": [{"text": req.message.strip()}]})
+    conv.append({"role": "assistant", "parts": [{"text": n8n_result["response"]}]})
+    _chat_sessions[sid] = conv
+
+    # Audit log
+    await _log_scan_start(request.app.state, target or "unknown", request, "n8n chat")
 
     return {
-        "response": result["response"],
-        "scan_data": scan_data,
+        "response": n8n_result["response"],
+        "scan_data": None,
     }
 
 

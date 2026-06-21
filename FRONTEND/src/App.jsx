@@ -65,9 +65,8 @@ export default function App() {
         <ErrorBoundary>
           <Sidebar page={page} onNavigate={(p) => { setPage(p); setMenuOpen(false) }} menuOpen={menuOpen} onToggle={() => setMenuOpen(!menuOpen)} onLogout={handleLogout} />
           <div style={{
-            flex: 1, padding: '24px', overflow: 'hidden',
+            flex: 1, padding: '24px', overflow: 'auto',
             marginLeft: isMobile ? 0 : undefined,
-            display: 'flex', flexDirection: 'column',
           }}>
             <div style={{ display: isMobile ? 'block' : 'none', marginBottom: 16 }}>
               <button onClick={() => setMenuOpen(!menuOpen)}

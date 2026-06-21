@@ -544,6 +544,13 @@ async def delete_chat_history(session_id: str = "default", request: Request = No
     return {"deleted": ok, "session_id": session_id}
 
 
+@app.get("/api/chat/sessions")
+async def list_chat_sessions(request: Request = None, _=Depends(_verify_token)):
+    loop = asyncio.get_event_loop()
+    sessions = await loop.run_in_executor(None, request.app.state.history_db.get_all_chat_sessions)
+    return {"sessions": sessions}
+
+
 # ⚠️ DIQQAT: TOS VA DOMAIN VERIFICATION VAQTINCHA O'CHIRILGAN
 # Sabab: Investor demo/sinov bosqichi
 # Sana: 2026-06-21

@@ -290,14 +290,11 @@ export default function Scanner() {
   // AI Chat States
   const [chatInput, setChatInput] = useState('')
   const [modelLoaded, setModelLoaded] = useState(null)
-  const [chatSessionId] = useState(() => {
-    let sid = localStorage.getItem('nexura_chat_session')
-    if (!sid) {
-      sid = 'chat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
-      localStorage.setItem('nexura_chat_session', sid)
-    }
-    return sid
+  const [chatSessions, setChatSessions] = useState([])
+  const [chatSessionId, setChatSessionId] = useState(() => {
+    return localStorage.getItem('nexura_chat_session') || ''
   })
+  const [showSidebar, setShowSidebar] = useState(true)
   
   // Terminal States
   const [terminalInput, setTerminalInput] = useState('')
@@ -328,9 +325,38 @@ export default function Scanner() {
     return () => clearInterval(interval)
   }, [])
 
-  // Load chat history on mount
+  // Load sessions list
   useEffect(() => {
+    const loadSessions = async () => {
+      try {
+        const res = await apiFetch('/api/chat/sessions')
+        if (res.ok) {
+          const data = await res.json()
+          setChatSessions(data.sessions || [])
+        }
+      } catch (e) {
+        console.warn('Chat sessions load failed:', e)
+      }
+    }
+    loadSessions()
+  }, [])
+
+  // Load chat history on mount or session switch
+  useEffect(() => {
+    if (modelLoaded === null) return
+
     const loadHistory = async () => {
+      if (!chatSessionId) {
+        setChatLogs([{
+          role: 'ai',
+          content: modelLoaded
+            ? "Assalomu alaykum! Men NEXURA AI yordamchisiman. Menga skanerlash buyrug'ingizni yozing, masalan: 'example.com saytining zaifliklarini tekshir'"
+            : "Assalomu alaykum! Hozirda AI yordamchisi vaqtincha mavjud emas. Terminal orqali to'g'ridan-to'g'ri skanerlash buyruqlarini ishlatishingiz mumkin. Masalan: nmap -F example.com",
+          timestamp: new Date(),
+        }])
+        return
+      }
+
       try {
         const res = await apiFetch(`/api/chat/history?session_id=${encodeURIComponent(chatSessionId)}`)
         if (res.ok) {
@@ -348,7 +374,6 @@ export default function Scanner() {
       } catch (e) {
         console.warn('Chat history load failed:', e)
       }
-      // No history — show welcome
       setChatLogs([{
         role: 'ai',
         content: modelLoaded
@@ -358,7 +383,7 @@ export default function Scanner() {
       }])
     }
 
-    if (modelLoaded !== null) loadHistory()
+    loadHistory()
   }, [modelLoaded, chatSessionId])
 
   useEffect(() => {
@@ -369,6 +394,21 @@ export default function Scanner() {
     terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [terminalLogs])
 
+  // Session management
+  const switchSession = (sid) => {
+    setChatSessionId(sid)
+    localStorage.setItem('nexura_chat_session', sid)
+    setShowSidebar(false)
+  }
+
+  const createNewSession = () => {
+    const sid = 'chat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
+    localStorage.setItem('nexura_chat_session', sid)
+    setChatSessionId(sid)
+    setChatLogs([])
+    setShowSidebar(false)
+  }
+
   // Submit message to AI assistant
   const handleChatSubmit = async (e) => {
     e.preventDefault()
@@ -376,6 +416,15 @@ export default function Scanner() {
 
     const userMsg = chatInput.trim()
     setChatInput('')
+
+    // Auto-create session if needed
+    let sid = chatSessionId
+    if (!sid) {
+      sid = 'chat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
+      localStorage.setItem('nexura_chat_session', sid)
+      setChatSessionId(sid)
+    }
+
     setChatLogs(prev => [...prev, { role: 'user', content: userMsg, timestamp: new Date() }])
 
     if (modelLoaded === false) {
@@ -400,7 +449,7 @@ export default function Scanner() {
       const res = await apiFetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg, session_id: chatSessionId }),
+        body: JSON.stringify({ message: userMsg, session_id: sid }),
       })
 
       if (!res.ok) {
@@ -525,58 +574,142 @@ export default function Scanner() {
         <div style={{
           flex: 1,
           display: 'flex',
-          flexDirection: 'column',
+          flexDirection: 'row',
           background: 'var(--bg-card)',
           borderRadius: 'var(--radius)',
           border: '1px solid var(--border)',
           overflow: 'hidden',
           boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
         }}>
-          {/* Chat Header */}
+          {/* CHAT HISTORY SIDEBAR */}
           <div style={{
+            width: showSidebar ? 220 : 0,
+            minWidth: showSidebar ? 220 : 0,
+            overflow: 'hidden',
             background: 'var(--bg-input)',
-            padding: '12px 16px',
-            borderBottom: '1px solid var(--border)',
+            borderRight: showSidebar ? '1px solid var(--border)' : 'none',
             display: 'flex',
-            alignItems: 'center',
-            gap: 10,
+            flexDirection: 'column',
+            transition: 'width 0.2s, min-width 0.2s',
           }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>NEXURA AI Assistant</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                <span style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: modelLoaded ? '#22c55e' : '#f59e0b',
-                  display: 'inline-block'
-                }} />
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  {modelLoaded ? 'Online' : 'Offline'}
-                </span>
-              </div>
-            </div>
-            {scanning && (
-              <span style={{
-                marginLeft: 'auto',
-                fontSize: 12,
-                color: 'var(--primary)',
-                background: 'rgba(24,95,165,0.15)',
-                padding: '4px 8px',
+            <div style={{
+              padding: 12,
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 6,
+            }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                Chatlar
+              </span>
+              <button onClick={createNewSession} style={{
+                background: 'var(--primary)',
+                color: '#fff',
+                border: 'none',
                 borderRadius: 4,
+                padding: '4px 8px',
+                fontSize: 11,
                 fontWeight: 600,
+                cursor: 'pointer',
+              }}>
+                + Yangi
+              </button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+              {chatSessions.length === 0 && (
+                <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+                  Hozircha chatlar yo'q
+                </div>
+              )}
+              {chatSessions.map((s, i) => {
+                const isActive = s.session_id === chatSessionId
+                const label = s.first_msg
+                  ? s.first_msg.replace('T', ' ').slice(0, 16)
+                  : `Chat ${i + 1}`
+                return (
+                  <div key={s.session_id} onClick={() => switchSession(s.session_id)} style={{
+                    padding: '10px 12px',
+                    cursor: 'pointer',
+                    background: isActive ? 'rgba(24,95,165,0.15)' : 'transparent',
+                    borderLeft: isActive ? '3px solid var(--primary)' : '3px solid transparent',
+                    fontSize: 12,
+                    color: isActive ? 'var(--primary)' : 'var(--text)',
+                    fontWeight: isActive ? 600 : 400,
+                    transition: 'all 0.15s',
+                  }}>
+                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {label}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {s.msg_count} xabar
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Chat Main Area */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            {/* Chat Header */}
+            <div style={{
+              background: 'var(--bg-input)',
+              padding: '12px 16px',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+            }}>
+              <button onClick={() => setShowSidebar(s => !s)} style={{
+                background: 'none',
+                border: '1px solid var(--border)',
+                borderRadius: 4,
+                padding: '4px 6px',
+                cursor: 'pointer',
+                color: 'var(--text-muted)',
+                fontSize: 14,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 6
               }}>
+                ☰
+              </button>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>NEXURA AI Assistant</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  <span style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: modelLoaded ? '#22c55e' : '#f59e0b',
+                    display: 'inline-block'
+                  }} />
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    {modelLoaded ? 'Online' : 'Offline'}
+                  </span>
+                </div>
+              </div>
+              {scanning && (
                 <span style={{
-                  width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)',
-                  animation: 'pulse 1.5s infinite'
-                }} />
-                AI Skanerlashda...
-              </span>
-            )}
-          </div>
+                  marginLeft: 'auto',
+                  fontSize: 12,
+                  color: 'var(--primary)',
+                  background: 'rgba(24,95,165,0.15)',
+                  padding: '4px 8px',
+                  borderRadius: 4,
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)',
+                    animation: 'pulse 1.5s infinite'
+                  }} />
+                  AI Skanerlashda...
+                </span>
+              )}
+            </div>
 
           {/* Chat Messages Log */}
           <div style={{
@@ -741,7 +874,8 @@ export default function Scanner() {
               </div>
             </StyledWrapper>
           </form>
-        </div>
+        </div>{/* End Chat Main Area */}
+        </div>{/* End LEFT COLUMN */}
 
         {/* RIGHT COLUMN: Terminal */}
         <TerminalBox>

@@ -318,7 +318,7 @@ const OutputArea = styled.div`
   padding: 4px;
   flex: 1;
   overflow-y: auto;
-  max-height: calc(100vh - 320px);
+  min-height: 0;
 `
 
 const OutputLine = styled.pre`
@@ -697,7 +697,7 @@ export default function Scanner() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16, paddingBottom: 80 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16, paddingBottom: 80, overflow: 'hidden', minHeight: 0 }}>
       {/* Title Header */}
       <div style={{ textAlign: 'center', marginBottom: 4 }}>
         <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 2 }}>
@@ -714,7 +714,8 @@ export default function Scanner() {
         flexDirection: winWidth < 1024 ? 'column' : 'row',
         gap: 20,
         flex: 1,
-        minHeight: 'calc(100vh - 150px)',
+        minHeight: 0,
+        overflow: 'hidden',
       }}>
         <PanelsContainer $column={winWidth < 1024}>
           {/* LEFT COLUMN: AI Chat Assistant */}
@@ -867,16 +868,16 @@ export default function Scanner() {
                     )}
                   </div>
 
-                {/* Chat Messages Log */}
-                <div style={{
-                  flex: 1,
-                  padding: 16,
-                  overflowY: 'auto',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 14,
-                  maxHeight: 'calc(100vh - 300px)',
-                }}>
+          {/* Chat Messages Log */}
+          <div style={{
+            flex: 1,
+            padding: 16,
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 14,
+            minHeight: 0,
+          }}>
                   {chatLogs.map((log, idx) => (
                     <div key={idx} style={{
                       alignSelf: log.role === 'user' ? 'flex-end' : 'flex-start',

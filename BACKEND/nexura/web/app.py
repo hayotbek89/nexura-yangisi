@@ -522,6 +522,12 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
     }
 
 
+# ⚠️ DIQQAT: DOMAIN VERIFICATION VAQTINCHA O'CHIRILGAN
+# Sabab: Investor demo/sinov bosqichi
+# Sana: 2026-06-21
+# TODO: Production relizidan oldin albatta yoqish kerak!
+# Qaytarish uchun: quyidagi "VAQTINCHA O'CHIRILGAN" blokni qayta yoqing
+
 # ---- Scan Permission Middleware ----
 
 async def verify_scan_permission(target: str | None, request: Request):
@@ -540,19 +546,23 @@ async def verify_scan_permission(target: str | None, request: Request):
         )
 
     # 2. Private target / own domain — skip verification
-    if is_private_target(domain) or domain == "nexuraai.uz":
-        return
+    # VAQTINCHA O'CHIRILGAN - DEMO REJIMI (investor ko'rsatuvi uchun)
+    # if is_private_target(domain) or domain == "nexuraai.uz":
+    #     return
 
     # 3. Domain verification check
-    verified = await loop.run_in_executor(None, request.app.state.history_db.is_domain_verified, domain)
-    if not verified:
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "error": "Domen tasdiqlanmagan. Avval /api/verify/request orqali domeningizni tasdiqlang.",
-                "code": "DOMAIN_NOT_VERIFIED",
-            },
-        )
+    # VAQTINCHA O'CHIRILGAN - DEMO REJIMI (investor ko'rsatuvi uchun)
+    # Production'ga chiqishdan oldin bu bloklash QAYTARILISHI SHART
+    # verified = await loop.run_in_executor(None, request.app.state.history_db.is_domain_verified, domain)
+    # if not verified:
+    #     raise HTTPException(
+    #         status_code=403,
+    #         detail={
+    #             "error": "Domen tasdiqlanmagan. Avval /api/verify/request orqali domeningizni tasdiqlang.",
+    #             "code": "DOMAIN_NOT_VERIFIED",
+    #         },
+    #     )
+    return
 
 
 async def _log_scan_start(state, target: str, request: Request, tools_used: str | None = None):
@@ -566,7 +576,7 @@ async def _log_scan_start(state, target: str, request: Request, tools_used: str 
             target,
             "scan_start",
             tools_used,
-            None,
+            "demo_mode_skipped",
             None,
             None,
         )

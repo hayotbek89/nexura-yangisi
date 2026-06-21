@@ -4,36 +4,62 @@ import { useWindowSize } from '../hooks/useWindowSize'
 import { apiFetch } from '../api'
 import styled, { keyframes } from 'styled-components'
 
-const minimizeOut = keyframes`
-  from {
-    transform: scale(1) translateY(0);
+const genieClose = keyframes`
+  0% {
+    clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
+    transform: scaleY(1) scaleX(1) translateY(0);
     opacity: 1;
   }
-  to {
-    transform: scale(0.05) translateY(150px);
+  30% {
+    clip-path: polygon(0% 0%, 100% 0%, 85% 60%, 15% 60%);
+    transform: scaleY(0.9) scaleX(0.95) translateY(20px);
+    opacity: 0.9;
+  }
+  60% {
+    clip-path: polygon(20% 0%, 80% 0%, 60% 85%, 40% 85%);
+    transform: scaleY(0.5) scaleX(0.4) translateY(100px);
+    opacity: 0.5;
+  }
+  100% {
+    clip-path: polygon(45% 0%, 55% 0%, 50% 100%, 50% 100%);
+    transform: scaleY(0.05) scaleX(0.05) translateY(250px);
     opacity: 0;
   }
 `
-const restoreIn = keyframes`
-  from {
-    transform: scale(0.05) translateY(150px);
+const genieOpen = keyframes`
+  0% {
+    clip-path: polygon(45% 0%, 55% 0%, 50% 100%, 50% 100%);
+    transform: scaleY(0.05) scaleX(0.05) translateY(250px);
     opacity: 0;
   }
-  to {
-    transform: scale(1) translateY(0);
+  40% {
+    clip-path: polygon(20% 0%, 80% 0%, 60% 85%, 40% 85%);
+    transform: scaleY(0.5) scaleX(0.4) translateY(100px);
+    opacity: 0.5;
+  }
+  70% {
+    clip-path: polygon(0% 0%, 100% 0%, 85% 60%, 15% 60%);
+    transform: scaleY(0.9) scaleX(0.95) translateY(20px);
+    opacity: 0.9;
+  }
+  100% {
+    clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
+    transform: scaleY(1) scaleX(1) translateY(0);
     opacity: 1;
   }
 `
 const PanelWrapper = styled.div`
   transform-origin: bottom center;
-  animation: ${props => props.$closing ? minimizeOut : restoreIn} 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  ${props => props.$hidden && `
-    pointer-events: none;
-    position: absolute;
-    width: 0;
-    height: 0;
-    overflow: hidden;
-  `}
+  animation: ${props => props.$closing ? genieClose : genieOpen} 0.55s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  will-change: transform, opacity, clip-path;
+`
+
+const dockBounce = keyframes`
+  0%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-18px) scale(1.1); }
+  50% { transform: translateY(0) scale(0.95); }
+  70% { transform: translateY(-8px) scale(1.05); }
+  85% { transform: translateY(0) scale(1); }
 `
 const PanelsContainer = styled.div`
   display: flex;
@@ -76,14 +102,16 @@ const DockItem = styled.button`
   color: #27c39f;
   font-size: 11px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scale(${props => props.$scale || 1}) translateY(${props => props.$scale > 1 ? -(props.$scale - 1) * 20 : 0}px);
+  transition: transform 0.15s cubic-bezier(0.25, 0.1, 0.25, 1);
+  transform-origin: bottom center;
+  animation: ${props => props.$justAdded ? dockBounce : 'none'} 0.6s cubic-bezier(0.25, 0.46, 0.45, 1.4);
   &:hover {
-    transform: translateY(-4px) scale(1.05);
     background: rgba(39, 195, 159, 0.2);
     box-shadow: 0 4px 12px rgba(39, 195, 159, 0.3);
   }
   &:active {
-    transform: translateY(-2px) scale(0.98);
+    transform: scale(${props => (props.$scale || 1) * 0.95}) translateY(0);
   }
 `
 const DockIcon = styled.div`
@@ -385,13 +413,27 @@ export default function Scanner() {
   const [chatClosing, setChatClosing] = useState(false)
   const [terminalMinimized, setTerminalMinimized] = useState(false)
   const [terminalClosing, setTerminalClosing] = useState(false)
+  const [chatJustMinimized, setChatJustMinimized] = useState(false)
+  const [terminalJustMinimized, setTerminalJustMinimized] = useState(false)
+  const [mouseX, setMouseX] = useState(null)
+  const dockRef = useRef(null)
+
+  const handleDockMouseMove = (e) => {
+    const rect = dockRef.current.getBoundingClientRect()
+    setMouseX(e.clientX - rect.left)
+  }
+  const handleDockMouseLeave = () => {
+    setMouseX(null)
+  }
 
   const handleMinimizeChat = () => {
     setChatClosing(true)
     setTimeout(() => {
       setChatMinimized(true)
       setChatClosing(false)
-    }, 450)
+      setChatJustMinimized(true)
+      setTimeout(() => setChatJustMinimized(false), 600)
+    }, 550)
   }
   const handleRestoreChat = () => {
     setChatMinimized(false)
@@ -401,10 +443,21 @@ export default function Scanner() {
     setTimeout(() => {
       setTerminalMinimized(true)
       setTerminalClosing(false)
-    }, 450)
+      setTerminalJustMinimized(true)
+      setTimeout(() => setTerminalJustMinimized(false), 600)
+    }, 550)
   }
   const handleRestoreTerminal = () => {
     setTerminalMinimized(false)
+  }
+
+  const getItemScale = (itemIndex, totalItems, itemWidth = 90) => {
+    if (mouseX === null) return 1
+    const itemCenter = itemIndex * itemWidth + itemWidth / 2
+    const distance = Math.abs(mouseX - itemCenter)
+    const maxDistance = 150
+    if (distance > maxDistance) return 1
+    return 1 + (1 - distance / maxDistance) * 0.4
   }
   
   // Terminal States
@@ -1068,15 +1121,28 @@ export default function Scanner() {
       </div>
 
       {/* macOS-style Dock */}
-      <Dock $empty={!chatMinimized && !terminalMinimized}>
+      <Dock
+        ref={dockRef}
+        onMouseMove={handleDockMouseMove}
+        onMouseLeave={handleDockMouseLeave}
+        $empty={!chatMinimized && !terminalMinimized}
+      >
         {chatMinimized && (
-          <DockItem onClick={handleRestoreChat}>
+          <DockItem
+            $scale={getItemScale(0, (chatMinimized && terminalMinimized) ? 2 : 1)}
+            $justAdded={chatJustMinimized}
+            onClick={handleRestoreChat}
+          >
             <DockIcon>💬</DockIcon>
             <span>AI Chat</span>
           </DockItem>
         )}
         {terminalMinimized && (
-          <DockItem onClick={handleRestoreTerminal}>
+          <DockItem
+            $scale={getItemScale((chatMinimized && terminalMinimized) ? 1 : 0, (chatMinimized && terminalMinimized) ? 2 : 1)}
+            $justAdded={terminalJustMinimized}
+            onClick={handleRestoreTerminal}
+          >
             <DockIcon>⌨</DockIcon>
             <span>Terminal</span>
           </DockItem>

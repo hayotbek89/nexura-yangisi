@@ -55,14 +55,10 @@ async def lifespan(app: FastAPI):
         app.state.reporter = ReportGenerator()
         app.state.scanner = NetworkScanner()
         app.state.history_db = HistoryDB()
-        app.state.engine = AIEngine()
-        app.state.selector = ToolSelector(app.state.engine) if app.state.engine.is_ready else None
         app.state.cve_lookup = CVELookup()
     yield
     if hasattr(app.state, "cve_lookup"):
         await app.state.cve_lookup.close()
-    if hasattr(app.state, "engine"):
-        app.state.engine.close()
     if hasattr(app.state, "runner"):
         app.state.runner.close()
 
@@ -208,9 +204,6 @@ class TosAcceptRequest(BaseModel):
     tos_version: str = Field(default="1.0", max_length=20)
 
 
-def _get_engine(request: Request) -> AIEngine:
-    return request.app.state.engine
-
 def _get_selector(request: Request) -> ToolSelector | None:
     return request.app.state.selector
 
@@ -266,14 +259,8 @@ async def start_scan(req: ScanRequest, request: Request, _=Depends(_verify_token
     await _log_scan_start(state, target or "unknown", request)
 
     selector = _get_selector(request)
-    if not selector:
-        engine = state.engine
-        if not engine.is_ready:
-            return JSONResponse(
-                status_code=503,
-                content={"error": "AI Engine yoqilmagan. GGUF model faylini joylashtiring."},
-            )
-        selector = ToolSelector(engine)
+    if selector is None:
+        selector = ToolSelector(None)
         state.selector = selector
 
     plan = await selector.create_plan_async(req.prompt, target)
@@ -283,7 +270,7 @@ async def start_scan(req: ScanRequest, request: Request, _=Depends(_verify_token
 
     report = state.reporter.create_report(plan.target, plan.intent)
 
-    if req.agentic and selector.engine.is_ready:
+    if req.agentic:
         results = await selector.run_agentic_scan_async(req.prompt, plan.target, state.runner)
         report.results = results
     else:
@@ -349,13 +336,12 @@ async def quick_scan(req: QuickScanRequest, request: Request, _=Depends(_verify_
 
 @app.get("/api/status")
 async def status(request: Request):
-    engine = _get_engine(request)
-    is_ready = engine.is_ready
+    n8n_configured = bool(config.N8N_WEBHOOK_URL)
     return {
         "name": "Nexura Scanner",
         "version": "2.0.0",
-        "ai_ready": is_ready,
-        "model_loaded": is_ready,
+        "ai_ready": n8n_configured,
+        "ai_backend": "n8n" if n8n_configured else "none",
         "tools": _check_tools(),
     }
 
@@ -501,21 +487,10 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
         elif ip_match:
             target = ip_match.group(1)
 
-    # Try n8n Claude AI Agent first, fallback to local WhiteRabbitNeo
+    # Send to n8n Claude AI Agent (send_to_n8n handles errors gracefully)
     n8n_result = await send_to_n8n(req.message.strip())
     ai_backend = "n8n"
-
-    if n8n_result.get("error"):
-        engine = request.app.state.engine
-        if engine.is_ready:
-            conv = db.get_chat_history(sid)
-            local_result = await engine.chat(req.message.strip(), conv)
-            response_text = local_result.get("response", "Javob olinmadi")
-            ai_backend = "local_wrn"
-        else:
-            response_text = n8n_result["response"]
-    else:
-        response_text = n8n_result["response"]
+    response_text = n8n_result["response"]
 
     # Save to persistent DB
     db.save_chat_message(sid, "user", req.message.strip(), ai_backend)
@@ -714,11 +689,8 @@ async def webhook_scan(req: WebhookScanRequest, request: Request, _=Depends(_ver
     await _log_scan_start(state, req.target or req.prompt, request)
 
     selector = _get_selector(request)
-    if not selector:
-        engine = state.engine
-        if not engine.is_ready:
-            return JSONResponse(status_code=503, content={"error": "AI Engine yoqilmagan"})
-        selector = ToolSelector(engine)
+    if selector is None:
+        selector = ToolSelector(None)
         state.selector = selector
 
     plan = await selector.create_plan_async(req.prompt, req.target)
@@ -778,11 +750,8 @@ async def webhook_scan_async(req: WebhookScanRequest, request: Request, _=Depend
     await _log_scan_start(state, req.target or req.prompt, request)
 
     selector = _get_selector(request)
-    if not selector:
-        engine = state.engine
-        if not engine.is_ready:
-            return JSONResponse(status_code=503, content={"error": "AI Engine yoqilmagan"})
-        selector = ToolSelector(engine)
+    if selector is None:
+        selector = ToolSelector(None)
         state.selector = selector
 
     plan = await selector.create_plan_async(req.prompt, req.target)

@@ -505,19 +505,31 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
         elif ip_match:
             target = ip_match.group(1)
 
-    # Send to n8n Claude AI Agent
+    # Try n8n Claude AI Agent first, fallback to local WhiteRabbitNeo
     n8n_result = await send_to_n8n(req.message.strip())
+    ai_backend = "n8n"
+
+    if n8n_result.get("error"):
+        engine = request.app.state.engine
+        if engine.is_ready:
+            local_result = await engine.chat(req.message.strip(), conv)
+            response_text = local_result.get("response", "Javob olinmadi")
+            ai_backend = "local_wrn"
+        else:
+            response_text = n8n_result["response"]
+    else:
+        response_text = n8n_result["response"]
 
     # Build minimal history (last exchange)
     conv.append({"role": "user", "parts": [{"text": req.message.strip()}]})
-    conv.append({"role": "assistant", "parts": [{"text": n8n_result["response"]}]})
+    conv.append({"role": "assistant", "parts": [{"text": response_text}]})
     _chat_sessions[sid] = conv
 
     # Audit log
-    await _log_scan_start(request.app.state, target or "unknown", request, "n8n chat")
+    await _log_scan_start(request.app.state, target or "unknown", request, f"{ai_backend} chat")
 
     return {
-        "response": n8n_result["response"],
+        "response": response_text,
         "scan_data": None,
     }
 

@@ -2,7 +2,56 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useScanner } from '../ScannerContext'
 import { useWindowSize } from '../hooks/useWindowSize'
 import { apiFetch } from '../api'
-import styled from 'styled-components'
+import styled, { keyframes } from 'styled-components'
+
+const minimizeOut = keyframes`
+  from {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.05) translateY(150px);
+    opacity: 0;
+  }
+`
+const restoreIn = keyframes`
+  from {
+    transform: scale(0.05) translateY(150px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+`
+const PanelWrapper = styled.div`
+  transform-origin: bottom center;
+  animation: ${props => props.$closing ? minimizeOut : restoreIn} 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  ${props => props.$hidden && `
+    pointer-events: none;
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+  `}
+`
+const RestoreButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(39, 195, 159, 0.1);
+  border: 1px solid #27c39f;
+  border-radius: 8px;
+  color: #27c39f;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover {
+    background: rgba(39, 195, 159, 0.2);
+  }
+`
 
 const StyledWrapper = styled.div`
   .pb-ai-input-wrap {
@@ -295,6 +344,31 @@ export default function Scanner() {
     return localStorage.getItem('nexura_chat_session') || ''
   })
   const [showSidebar, setShowSidebar] = useState(true)
+  const [chatMinimized, setChatMinimized] = useState(false)
+  const [chatClosing, setChatClosing] = useState(false)
+  const [terminalMinimized, setTerminalMinimized] = useState(false)
+  const [terminalClosing, setTerminalClosing] = useState(false)
+
+  const handleMinimizeChat = () => {
+    setChatClosing(true)
+    setTimeout(() => {
+      setChatMinimized(true)
+      setChatClosing(false)
+    }, 450)
+  }
+  const handleRestoreChat = () => {
+    setChatMinimized(false)
+  }
+  const handleMinimizeTerminal = () => {
+    setTerminalClosing(true)
+    setTimeout(() => {
+      setTerminalMinimized(true)
+      setTerminalClosing(false)
+    }, 450)
+  }
+  const handleRestoreTerminal = () => {
+    setTerminalMinimized(false)
+  }
   
   // Terminal States
   const [terminalInput, setTerminalInput] = useState('')
@@ -571,7 +645,8 @@ export default function Scanner() {
         minHeight: 'calc(100vh - 150px)',
       }}>
         {/* LEFT COLUMN: AI Chat Assistant */}
-        <div style={{
+        {!chatMinimized ? (
+        <PanelWrapper $closing={chatClosing} style={{
           flex: 1,
           display: 'flex',
           flexDirection: 'row',
@@ -661,6 +736,13 @@ export default function Scanner() {
               alignItems: 'center',
               gap: 10,
             }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span onClick={handleMinimizeChat} style={{ width: 12, height: 12, borderRadius: '50%', background: '#ee411a', cursor: 'pointer', display: 'inline-block', transition: 'transform 0.15s' }}
+                  onMouseEnter={e => e.target.style.transform = 'scale(1.3)'}
+                  onMouseLeave={e => e.target.style.transform = 'scale(1)'} />
+                <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#f5a623', display: 'inline-block' }} />
+                <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#27c39f', display: 'inline-block' }} />
+              </div>
               <button onClick={() => setShowSidebar(s => !s)} style={{
                 background: 'none',
                 border: '1px solid var(--border)',
@@ -875,13 +957,20 @@ export default function Scanner() {
             </StyledWrapper>
           </form>
         </div>{/* End Chat Main Area */}
-        </div>{/* End LEFT COLUMN */}
+        </PanelWrapper>
+        ) : (
+          <RestoreButton onClick={handleRestoreChat}>
+            <span>💬</span> AI Chat'ni ochish
+          </RestoreButton>
+        )}
 
         {/* RIGHT COLUMN: Terminal */}
+        {!terminalMinimized ? (
+        <PanelWrapper $closing={terminalClosing} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <TerminalBox>
           <TerminalToolbar>
             <Buttons>
-              <Dot $color="#ee411a" />
+              <Dot $color="#ee411a" onClick={handleMinimizeTerminal} />
               <Dot />
               <Dot />
             </Buttons>
@@ -920,6 +1009,12 @@ export default function Scanner() {
             </InputRow>
           </TerminalBody>
         </TerminalBox>
+        </PanelWrapper>
+        ) : (
+          <RestoreButton onClick={handleRestoreTerminal}>
+            <span>⌨</span> Terminalni ochish
+          </RestoreButton>
+        )}
       </div>
     </div>
   )

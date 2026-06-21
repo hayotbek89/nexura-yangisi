@@ -95,6 +95,17 @@ def _init_db(db_path: str):
                 ip_address TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                ai_backend TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_messages(session_id, id);
+
             CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(scan_date);
             CREATE INDEX IF NOT EXISTS idx_vulns_session ON vulnerabilities(session_id);
             CREATE INDEX IF NOT EXISTS idx_ports_session ON ports(session_id);
@@ -447,6 +458,74 @@ class HistoryDB:
         except Exception as e:
             logger.error("Failed to check ToS acceptance: %s", e)
             return False
+
+    def save_chat_message(self, session_id: str, role: str, content: str, ai_backend: str | None = None):
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                """INSERT INTO chat_messages (session_id, role, content, ai_backend)
+                   VALUES (?, ?, ?, ?)""",
+                (session_id, role, content, ai_backend),
+            )
+        except Exception as e:
+            logger.error("Failed to save chat message: %s", e)
+
+    def get_chat_history(self, session_id: str, limit: int = 50) -> list[dict]:
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT role, content, ai_backend, created_at
+                   FROM chat_messages
+                   WHERE session_id = ?
+                   ORDER BY id ASC
+                   LIMIT ?""",
+                (session_id, limit),
+            ).fetchall()
+            return [
+                {
+                    "role": r["role"],
+                    "parts": [{"text": r["content"]}],
+                    "ai_backend": r["ai_backend"],
+                    "created_at": r["created_at"],
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            logger.error("Failed to get chat history: %s", e)
+            return []
+
+    def delete_chat_session(self, session_id: str) -> bool:
+        conn = self._get_conn()
+        try:
+            conn.execute("DELETE FROM chat_messages WHERE session_id = ?", (session_id,))
+            return True
+        except Exception as e:
+            logger.error("Failed to delete chat session: %s", e)
+            return False
+
+    def get_all_chat_sessions(self) -> list[dict]:
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT session_id, COUNT(*) as msg_count,
+                          MIN(created_at) as first_msg, MAX(created_at) as last_msg
+                   FROM chat_messages
+                   GROUP BY session_id
+                   ORDER BY last_msg DESC
+                   LIMIT 100"""
+            ).fetchall()
+            return [
+                {
+                    "session_id": r["session_id"],
+                    "msg_count": r["msg_count"],
+                    "first_msg": r["first_msg"],
+                    "last_msg": r["last_msg"],
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            logger.error("Failed to get chat sessions: %s", e)
+            return []
 
     def get_stats(self) -> dict:
         conn = self._get_conn()

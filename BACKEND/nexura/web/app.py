@@ -485,12 +485,8 @@ async def list_reports(request: Request, _=Depends(_verify_token)):
 
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_token)):
-    # Get or create conversation history for this session
     sid = req.session_id
-    if sid not in _chat_sessions:
-        _chat_sessions[sid] = []
-
-    conv = _chat_sessions[sid]
+    db = request.app.state.history_db
 
     # Extract target from message for convenience
     target = req.target
@@ -512,6 +508,7 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
     if n8n_result.get("error"):
         engine = request.app.state.engine
         if engine.is_ready:
+            conv = db.get_chat_history(sid)
             local_result = await engine.chat(req.message.strip(), conv)
             response_text = local_result.get("response", "Javob olinmadi")
             ai_backend = "local_wrn"
@@ -520,10 +517,9 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
     else:
         response_text = n8n_result["response"]
 
-    # Build minimal history (last exchange)
-    conv.append({"role": "user", "parts": [{"text": req.message.strip()}]})
-    conv.append({"role": "assistant", "parts": [{"text": response_text}]})
-    _chat_sessions[sid] = conv
+    # Save to persistent DB
+    db.save_chat_message(sid, "user", req.message.strip(), ai_backend)
+    db.save_chat_message(sid, "assistant", response_text, ai_backend)
 
     # Audit log
     await _log_scan_start(request.app.state, target or "unknown", request, f"{ai_backend} chat")
@@ -532,6 +528,20 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
         "response": response_text,
         "scan_data": None,
     }
+
+
+@app.get("/api/chat/history")
+async def get_chat_history(session_id: str = "default", request: Request = None, _=Depends(_verify_token)):
+    loop = asyncio.get_event_loop()
+    messages = await loop.run_in_executor(None, request.app.state.history_db.get_chat_history, session_id, 100)
+    return {"session_id": session_id, "messages": messages}
+
+
+@app.delete("/api/chat/history")
+async def delete_chat_history(session_id: str = "default", request: Request = None, _=Depends(_verify_token)):
+    loop = asyncio.get_event_loop()
+    ok = await loop.run_in_executor(None, request.app.state.history_db.delete_chat_session, session_id)
+    return {"deleted": ok, "session_id": session_id}
 
 
 # ⚠️ DIQQAT: TOS VA DOMAIN VERIFICATION VAQTINCHA O'CHIRILGAN

@@ -290,6 +290,14 @@ export default function Scanner() {
   // AI Chat States
   const [chatInput, setChatInput] = useState('')
   const [modelLoaded, setModelLoaded] = useState(null)
+  const [chatSessionId] = useState(() => {
+    let sid = localStorage.getItem('nexura_chat_session')
+    if (!sid) {
+      sid = 'chat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
+      localStorage.setItem('nexura_chat_session', sid)
+    }
+    return sid
+  })
   
   // Terminal States
   const [terminalInput, setTerminalInput] = useState('')
@@ -320,25 +328,38 @@ export default function Scanner() {
     return () => clearInterval(interval)
   }, [])
 
-  // Welcome message based on modelLoaded status
+  // Load chat history on mount
   useEffect(() => {
-    if (modelLoaded === null) return
-
-    const welcomeText = modelLoaded
-      ? "Assalomu alaykum! Men NEXURA AI yordamchisiman. Menga skanerlash buyrug'ingizni yozing, masalan: 'example.com saytining zaifliklarini tekshir'"
-      : "Assalomu alaykum! Hozirda AI yordamchisi vaqtincha mavjud emas. Terminal orqali to'g'ridan-to'g'ri skanerlash buyruqlarini ishlatishingiz mumkin. Masalan: nmap -F example.com"
-
-    setChatLogs(prev => {
-      if (prev.length <= 1) {
-        return [{
-          role: 'ai',
-          content: welcomeText,
-          timestamp: new Date()
-        }]
+    const loadHistory = async () => {
+      try {
+        const res = await apiFetch(`/api/chat/history?session_id=${encodeURIComponent(chatSessionId)}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.messages && data.messages.length > 0) {
+            const formatted = data.messages.map(m => ({
+              role: m.role === 'user' ? 'user' : 'ai',
+              content: m.parts?.[0]?.text || '',
+              timestamp: new Date(m.created_at || Date.now()),
+            }))
+            setChatLogs(formatted)
+            return
+          }
+        }
+      } catch (e) {
+        console.warn('Chat history load failed:', e)
       }
-      return prev
-    })
-  }, [modelLoaded])
+      // No history — show welcome
+      setChatLogs([{
+        role: 'ai',
+        content: modelLoaded
+          ? "Assalomu alaykum! Men NEXURA AI yordamchisiman. Menga skanerlash buyrug'ingizni yozing, masalan: 'example.com saytining zaifliklarini tekshir'"
+          : "Assalomu alaykum! Hozirda AI yordamchisi vaqtincha mavjud emas. Terminal orqali to'g'ridan-to'g'ri skanerlash buyruqlarini ishlatishingiz mumkin. Masalan: nmap -F example.com",
+        timestamp: new Date(),
+      }])
+    }
+
+    if (modelLoaded !== null) loadHistory()
+  }, [modelLoaded, chatSessionId])
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -379,7 +400,7 @@ export default function Scanner() {
       const res = await apiFetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg }),
+        body: JSON.stringify({ message: userMsg, session_id: chatSessionId }),
       })
 
       if (!res.ok) {

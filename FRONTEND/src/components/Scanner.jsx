@@ -470,7 +470,7 @@ export default function Scanner() {
       })
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}))
-        throw new Error(errData.error || 'Xatolik')
+        throw new Error(errData.error || errData.detail || `Xatolik (${res.status})`)
       }
       const data = await res.json()
       setTerminalLogs(prev => [...prev, `[NEXURA] Buyruq: ${data.command}`])

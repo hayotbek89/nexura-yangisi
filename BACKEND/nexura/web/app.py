@@ -563,7 +563,7 @@ async def scan_with_selected_tool(req: ScanSelectRequest, request: Request, _=De
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=config.TIMEOUT)
     except asyncio.TimeoutError:
         proc.kill()
-        return {"command": command, "output": "", "error_log": "Buyruq vaqt chegarasidan oshdi", "code": -1, "generated_by": "n8n" if not n8n_error else "template"}
+        return {"command": command, "output": "", "error_log": "Buyruq vaqt chegarasidan oshdi", "code": -1, "generated_by": "template"}
     
     output = stdout.decode("utf-8", errors="replace").strip()
     error_log = stderr.decode("utf-8", errors="replace").strip()

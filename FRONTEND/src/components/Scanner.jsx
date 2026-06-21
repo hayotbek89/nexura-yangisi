@@ -7,51 +7,33 @@ import styled, { keyframes } from 'styled-components'
 const genieClose = keyframes`
   0% {
     clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
-    transform: scaleY(1) scaleX(1) translateY(0);
+    transform: scale(1) translate3d(0, 0, 0);
     opacity: 1;
-  }
-  30% {
-    clip-path: polygon(0% 0%, 100% 0%, 85% 60%, 15% 60%);
-    transform: scaleY(0.9) scaleX(0.95) translateY(20px);
-    opacity: 0.9;
-  }
-  60% {
-    clip-path: polygon(20% 0%, 80% 0%, 60% 85%, 40% 85%);
-    transform: scaleY(0.5) scaleX(0.4) translateY(100px);
-    opacity: 0.5;
   }
   100% {
     clip-path: polygon(45% 0%, 55% 0%, 50% 100%, 50% 100%);
-    transform: scaleY(0.05) scaleX(0.05) translateY(250px);
+    transform: scale(0.05) translate3d(0, 250px, 0);
     opacity: 0;
   }
 `
 const genieOpen = keyframes`
   0% {
     clip-path: polygon(45% 0%, 55% 0%, 50% 100%, 50% 100%);
-    transform: scaleY(0.05) scaleX(0.05) translateY(250px);
+    transform: scale(0.05) translate3d(0, 250px, 0);
     opacity: 0;
-  }
-  40% {
-    clip-path: polygon(20% 0%, 80% 0%, 60% 85%, 40% 85%);
-    transform: scaleY(0.5) scaleX(0.4) translateY(100px);
-    opacity: 0.5;
-  }
-  70% {
-    clip-path: polygon(0% 0%, 100% 0%, 85% 60%, 15% 60%);
-    transform: scaleY(0.9) scaleX(0.95) translateY(20px);
-    opacity: 0.9;
   }
   100% {
     clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
-    transform: scaleY(1) scaleX(1) translateY(0);
+    transform: scale(1) translate3d(0, 0, 0);
     opacity: 1;
   }
 `
 const PanelWrapper = styled.div`
   transform-origin: bottom center;
-  animation: ${props => props.$closing ? genieClose : genieOpen} 0.55s cubic-bezier(0.65, 0, 0.35, 1) forwards;
-  will-change: transform, opacity, clip-path;
+  animation: ${props => props.$closing ? genieClose : genieOpen} 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  perspective: 1000px;
 `
 
 const dockBounce = keyframes`
@@ -433,7 +415,7 @@ export default function Scanner() {
       setChatClosing(false)
       setChatJustMinimized(true)
       setTimeout(() => setChatJustMinimized(false), 600)
-    }, 550)
+    }, 600)
   }
   const handleRestoreChat = () => {
     setChatMinimized(false)
@@ -445,7 +427,7 @@ export default function Scanner() {
       setTerminalClosing(false)
       setTerminalJustMinimized(true)
       setTimeout(() => setTerminalJustMinimized(false), 600)
-    }, 550)
+    }, 600)
   }
   const handleRestoreTerminal = () => {
     setTerminalMinimized(false)

@@ -522,28 +522,29 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
     }
 
 
-# ⚠️ DIQQAT: DOMAIN VERIFICATION VAQTINCHA O'CHIRILGAN
+# ⚠️ DIQQAT: TOS VA DOMAIN VERIFICATION VAQTINCHA O'CHIRILGAN
 # Sabab: Investor demo/sinov bosqichi
 # Sana: 2026-06-21
 # TODO: Production relizidan oldin albatta yoqish kerak!
-# Qaytarish uchun: quyidagi "VAQTINCHA O'CHIRILGAN" blokni qayta yoqing
+# Qaytarish uchun: quyidagi "VAQTINCHA O'CHIRILGAN" bloklarni qayta yoqing
 
 # ---- Scan Permission Middleware ----
 
 async def verify_scan_permission(target: str | None, request: Request):
     if not target:
         return
-    domain = extract_domain(target)
-    user_id = "default"
+    # VAQTINCHA O'CHIRILGAN - DEMO REJIMI (investor ko'rsatuvi uchun)
+    # domain = extract_domain(target)
+    # user_id = "default"
 
-    # 1. ToS check
-    loop = asyncio.get_event_loop()
-    tos_ok = await loop.run_in_executor(None, request.app.state.history_db.is_tos_accepted, user_id)
-    if not tos_ok:
-        raise HTTPException(
-            status_code=403,
-            detail={"error": "Avval foydalanish shartlarini qabul qiling", "code": "TOS_NOT_ACCEPTED"},
-        )
+    # 1. ToS check — VAQTINCHA O'CHIRILGAN
+    # loop = asyncio.get_event_loop()
+    # tos_ok = await loop.run_in_executor(None, request.app.state.history_db.is_tos_accepted, user_id)
+    # if not tos_ok:
+    #     raise HTTPException(
+    #         status_code=403,
+    #         detail={"error": "Avval foydalanish shartlarini qabul qiling", "code": "TOS_NOT_ACCEPTED"},
+    #     )
 
     # 2. Private target / own domain — skip verification
     # VAQTINCHA O'CHIRILGAN - DEMO REJIMI (investor ko'rsatuvi uchun)

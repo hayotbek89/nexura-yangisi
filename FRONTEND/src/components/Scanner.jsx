@@ -1103,20 +1103,7 @@ export default function Scanner() {
             </Panel>
           )}
 
-          {/* Both panels closed: show placeholder */}
-          {chatMinimized && terminalMinimized && (
-            <div style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-muted)',
-              fontSize: 14,
-              opacity: 0.6,
-            }}>
-              Barcha panellar yopiq — pastdagi dock'dan oching
-            </div>
-          )}
+
         </PanelsContainer>
       </div>
 

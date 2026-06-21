@@ -623,7 +623,7 @@ export default function Scanner() {
     // Option A: detect target in user message → show tool selection
     const matchTarget = userMsg.match(TARGET_RE)
     if (matchTarget) {
-      setPendingTarget(matchTarget[0])
+      setPendingTarget(matchTarget[0].replace(/\/+$/, ''))
     } else {
       setPendingTarget(null)
     }

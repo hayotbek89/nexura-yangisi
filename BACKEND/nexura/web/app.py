@@ -467,14 +467,33 @@ TOOLS_META = [
     {"name": "amass",    "label": "Amass",    "description": "Subdomain va domen ma'lumotlarini yig'ish"},
 ]
 
+import re as _re
+
+def _clean_target(target: str, tool: str) -> str:
+    # Strip URL scheme
+    host = _re.sub(r'^https?://', '', target)
+    # Strip path/query/fragment
+    host = _re.sub(r'[/?#].*$', '', host)
+    if tool in ("nmap", "amass"):
+        return host  # just hostname/IP
+    if tool in ("nuclei", "nikto", "whatweb"):
+        scheme = "https://" if target.startswith("https://") else ("http://" if target.startswith("http://") else "https://")
+        return scheme + host
+    if tool == "gobuster":
+        scheme = "https://" if target.startswith("https://") else ("http://" if target.startswith("http://") else "https://")
+        return scheme + host
+    if tool == "sqlmap":
+        return target  # full URL with path
+    return host
+
 TOOL_TEMPLATES = {
-    "nmap":     "nmap -sV -sC -O -T4 {target}",
+    "nmap":     "nmap -sV -sC -O -T4 {host}",
     "nuclei":   "nuclei -u {target} -severity low,medium,high,critical",
     "nikto":    "nikto -h {target}",
     "sqlmap":   "sqlmap -u {target} --batch --random-agent",
     "gobuster": "gobuster dir -u {target} -w /usr/share/wordlists/dirb/common.txt -t 50",
     "whatweb":  "whatweb {target}",
-    "amass":    "amass enum -d {target}",
+    "amass":    "amass enum -d {host}",
 }
 
 @app.get("/api/tools")
@@ -495,29 +514,27 @@ async def scan_with_selected_tool(req: ScanSelectRequest, request: Request, _=De
     if not config.is_tool_available(tool):
         return JSONResponse(status_code=400, content={"error": f"'{tool}' dasturi serverda topilmadi"})
     
-    # Generate command via n8n with fallback to template
-    command = None
-    n8n_error = None
+    # Use template command directly (tool already selected by user)
+    host = _clean_target(target, tool)
+    template = TOOL_TEMPLATES.get(tool)
+    if template:
+        command = template.format(target=target, host=host)
+    else:
+        command = f"{tool} {host}"
+    
+    # Try n8n to generate a smarter command, validate response starts with tool name
     try:
         prompt = (
             f"Foydalanuvchi '{target}' manzilini '{tool}' vositasi bilan tekshirmoqchi. "
             f"Aynan shu vosita uchun to'g'ri terminal buyrug'ini yoz. "
-            f"Javobda FAQAT buyruq matni bo'lsin, boshqa hech qanday matn, tushuntirish yoki belgi bo'lmasin."
+            f"Javobda FAQAT buyruq matni bo'lsin, boshqa hech narsa qo'shma."
         )
         n8n_result = await send_to_n8n(prompt)
         resp = n8n_result.get("response", "").strip().strip("`").strip()
-        if resp and len(resp) > 5 and not resp.startswith("Kechirasiz") and not resp.startswith("Xatolik"):
+        if resp and resp.lower().startswith(tool.lower()):
             command = resp
-    except Exception as e:
-        n8n_error = str(e)
-    
-    if not command:
-        template = TOOL_TEMPLATES.get(tool)
-        if template:
-            command = template.format(target=target)
-    
-    if not command:
-        return JSONResponse(status_code=500, content={"error": "Buyruq yaratib bo'lmadi"})
+    except Exception:
+        pass
     
     # Execute the command (reuse terminal logic)
     try:
@@ -995,7 +1012,8 @@ async def run_terminal(req: TerminalRequest, request: Request, _=Depends(_verify
         template = TOOL_TEMPLATES.get(scan_tool)
         if not template:
             return {"output": "", "error": f"'{scan_tool}' uchun buyruq shabloni yo'q", "code": 1}
-        cmd = template.format(target=scan_target)
+        clean = _clean_target(scan_target, scan_tool)
+        cmd = template.format(target=scan_target, host=clean)
         # Re-split with the new command
         try:
             cmd_args = shlex.split(cmd)

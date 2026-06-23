@@ -294,6 +294,8 @@ const TerminalBody = styled.div`
   font-size: 12px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 `
 
 const Prompt = styled.div`
@@ -648,7 +650,16 @@ export default function Scanner() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatLogs, chatLoading])
 
+  // Smart auto-scroll: only scroll down if user is already near bottom
+  const [terminalScrolledUp, setTerminalScrolledUp] = useState({})
+  const handleTerminalScroll = (termId, e) => {
+    const el = e.currentTarget
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    setTerminalScrolledUp(prev => ({ ...prev, [termId]: !isNearBottom }))
+  }
   useEffect(() => {
+    const term = terminals.find(t => t.id === activeTerminal)
+    if (!term || terminalScrolledUp[activeTerminal]) return
     const ref = termRefs.current[activeTerminal]
     if (ref) ref.scrollIntoView({ behavior: 'smooth' })
   }, [activeTerminal, terminals])
@@ -1291,7 +1302,7 @@ export default function Scanner() {
                         <BlingSpan>$</BlingSpan>
                         <Cursor />
                       </Prompt>
-                      <OutputArea>
+                      <OutputArea onScroll={(e) => handleTerminalScroll(t.id, e)}>
                         {t.logs.length === 0 && !t.loading && (
                           <OutputLine $log="">Welcome to NEXURA Security Terminal #{terminals.indexOf(t) + 1}</OutputLine>
                         )}

@@ -298,12 +298,6 @@ const TerminalBody = styled.div`
   overflow: hidden;
 `
 
-const Prompt = styled.div`
-  display: flex;
-  align-items: center;
-  padding: 4px;
-`
-
 const PromptSpan = styled.span`
   margin-left: 4px;
 `
@@ -318,22 +312,6 @@ const LocationSpan = styled(PromptSpan)`
 
 const BlingSpan = styled(PromptSpan)`
   color: #ddd;
-`
-
-const Cursor = styled.span`
-  display: block;
-  height: 14px;
-  width: 5px;
-  margin-left: 10px;
-  animation: curbl 1200ms linear infinite;
-
-  @keyframes curbl {
-    0% { background: #fff; }
-    49% { background: #fff; }
-    60% { background: transparent; }
-    99% { background: transparent; }
-    100% { background: #fff; }
-  }
 `
 
 const OutputArea = styled.div`
@@ -354,11 +332,6 @@ const OutputLine = styled.pre`
     p.$log?.startsWith('nexura@scanner') ? '#38bdf8' :
     p.$log?.startsWith('[ERROR]') || p.$log?.startsWith('[FAIL]') ? '#ef4444' :
     p.$log?.startsWith('[STDERR]') ? '#f59e0b' : '#e6e6e6'};
-`
-
-const InputRow = styled.div`
-  padding: 8px 4px 4px;
-  flex-shrink: 0;
 `
 
 const TerminalInput2 = styled.input`
@@ -1294,15 +1267,14 @@ export default function Scanner() {
                   <AddTab onClick={addTerminal}>+</AddTab>
                 </TerminalToolbar>
                 <TerminalBody>
-                  {terminals.map(t => (
+                  {terminals.map(t => {
+                    const inputId = 'term-input-' + t.id
+                    return (
                     <div key={t.id} style={{ display: t.id === activeTerminal ? 'flex' : 'none', flex: 1, flexDirection: 'column', minHeight: 0 }}>
-                      <Prompt>
-                        <UserSpan>00Kubi@admin:</UserSpan>
-                        <LocationSpan>~</LocationSpan>
-                        <BlingSpan>$</BlingSpan>
-                        <Cursor />
-                      </Prompt>
-                      <OutputArea onScroll={(e) => handleTerminalScroll(t.id, e)}>
+                      <OutputArea onScroll={(e) => handleTerminalScroll(t.id, e)} onClick={() => {
+                        const inp = document.getElementById(inputId)
+                        if (inp) inp.focus()
+                      }}>
                         {t.logs.length === 0 && !t.loading && (
                           <OutputLine $log="">Welcome to NEXURA Security Terminal #{terminals.indexOf(t) + 1}</OutputLine>
                         )}
@@ -1312,25 +1284,31 @@ export default function Scanner() {
                         {t.loading && (
                           <OutputLine $log="">Buyruq bajarilmoqda, kuting...</OutputLine>
                         )}
+                        <div style={{ display: 'flex', alignItems: 'center', padding: '4px 0' }}>
+                          <UserSpan style={{marginLeft:4}}>00Kubi@admin:</UserSpan>
+                          <LocationSpan>~</LocationSpan>
+                          <BlingSpan>$</BlingSpan>
+                          <form onSubmit={(e) => handleTerminalSubmit(e, t.id)} style={{ display: 'inline', flex: 1 }}>
+                            <TerminalInput2
+                              id={inputId}
+                              value={t.input}
+                              onChange={e => {
+                                setTerminals(prev => prev.map(term =>
+                                  term.id === t.id ? { ...term, input: e.target.value } : term
+                                ))
+                              }}
+                              placeholder="nmap -F target.com"
+                              disabled={t.loading}
+                              autoFocus
+                              style={{ width: '100%' }}
+                            />
+                          </form>
+                        </div>
                         <div ref={el => termRefs.current[t.id] = el} />
                       </OutputArea>
-                      <InputRow>
-                        <form onSubmit={(e) => handleTerminalSubmit(e, t.id)}>
-                          <TerminalInput2
-                            value={t.input}
-                            onChange={e => {
-                              setTerminals(prev => prev.map(term =>
-                                term.id === t.id ? { ...term, input: e.target.value } : term
-                              ))
-                            }}
-                            placeholder="nmap -F target.com"
-                            disabled={t.loading}
-                            autoFocus
-                          />
-                        </form>
-                      </InputRow>
                     </div>
-                  ))}
+                    )
+                  })}
                 </TerminalBody>
               </TerminalBox>
               </PanelWrapper>

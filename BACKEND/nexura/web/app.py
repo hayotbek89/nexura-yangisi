@@ -399,6 +399,7 @@ async def status(request: Request):
         "name": "Nexura Scanner",
         "version": "2.0.0",
         "ai_ready": n8n_configured,
+        "model_loaded": n8n_configured,
         "ai_backend": "n8n" if n8n_configured else "none",
         "tools": _check_tools(),
     }

@@ -457,45 +457,45 @@ export default function Scanner() {
     }).catch(() => {})
   }, [])
 
-  const appendToActiveTerminal = (lines) => {
-    setTerminals(prev => prev.map(t =>
-      t.id === activeTerminal
-        ? { ...t, logs: [...t.logs, ...(Array.isArray(lines) ? lines : [lines])] }
-        : t
-    ))
+  // Build command from tool + target (mirrors backend TOOL_TEMPLATES + _clean_target)
+  const TOOL_TEMPLATES = {
+    nmap: 'nmap -sV -sC -O -T4 {host}',
+    nuclei: 'nuclei -u {target} -severity low,medium,high,critical',
+    nikto: 'nikto -h {target}',
+    sqlmap: 'sqlmap -u {target} --batch --random-agent',
+    gobuster: 'gobuster dir -u {target} -w /usr/share/wordlists/dirb/common.txt -t 50',
+    whatweb: 'whatweb {target}',
+    amass: 'amass enum -d {host}',
   }
-
-  const setActiveTerminalLoading = (val) => {
-    setTerminals(prev => prev.map(t =>
-      t.id === activeTerminal ? { ...t, loading: val } : t
-    ))
+  const cleanTarget = (target, tool) => {
+    let host = target.replace(/^https?:\/\//, '').replace(/[/?#].*$/, '')
+    if (['nmap', 'amass'].includes(tool)) return host
+    if (['nuclei', 'nikto', 'whatweb', 'gobuster'].includes(tool)) {
+      const scheme = target.startsWith('https://') ? 'https://' : target.startsWith('http://') ? 'http://' : 'https://'
+      return scheme + host
+    }
+    if (tool === 'sqlmap') return target
+    return host
   }
+  const termSubmitRefs = useRef({})
 
-  const runScanWithTool = async (target, tool) => {
+  const runScanWithTool = (target, tool) => {
+    const template = TOOL_TEMPLATES[tool]
+    if (!template) return
+    const host = cleanTarget(target, tool)
+    const cmd = template.replace('{target}', target).replace('{host}', host)
+    // Set the command into the active terminal's input
+    setTerminals(prev => prev.map(t =>
+      t.id === activeTerminal ? { ...t, input: cmd } : t
+    ))
     setQsLoading(true)
     setPendingTarget(null)
-    appendToActiveTerminal([`[NEXURA] ${tool.toUpperCase()} bilan ${target} skanerlanmoqda...`])
-    try {
-      const res = await apiFetch('/api/scan/select', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target, tool }),
-      })
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}))
-        throw new Error(errData.error || errData.detail || `Xatolik (${res.status})`)
-      }
-      const data = await res.json()
-      const lines = [`[NEXURA] Buyruq: ${data.command}`]
-      if (data.output) lines.push(data.output)
-      if (data.error_log) lines.push(`[STDERR]: ${data.error_log}`)
-      if (data.code !== 0 && !data.output) lines.push(`Exit code: ${data.code}`)
-      lines.push(`[NEXURA] ${tool.toUpperCase()} skanerlash yakunlandi`)
-      appendToActiveTerminal(lines)
-    } catch (err) {
-      appendToActiveTerminal([`[ERROR]: ${err.message}`])
-    }
-    setQsLoading(false)
+    // Auto-submit the terminal form on next render
+    setTimeout(() => {
+      const form = termSubmitRefs.current[activeTerminal]
+      if (form) form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }))
+      setQsLoading(false)
+    }, 100)
   }
 
   // Detect domain/IP/URL pattern for Option A
@@ -1207,7 +1207,7 @@ export default function Scanner() {
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {availableTools.map(t => (
-                        <button key={t.name} onClick={() => { runScanWithTool(pendingTarget, t.name); setShowQuickScan(false) }}
+                        <button key={t.name} onClick={() => { runScanWithTool(pendingTarget, t.name); setShowQuickScan(false); setPendingTarget(null) }}
                           style={{
                             padding: '6px 12px', background: 'rgba(24,95,165,0.15)', border: '1px solid var(--primary)',
                             borderRadius: 6, color: 'var(--primary)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
@@ -1288,7 +1288,7 @@ export default function Scanner() {
                           <UserSpan style={{marginLeft:4}}>00Kubi@admin:</UserSpan>
                           <LocationSpan>~</LocationSpan>
                           <BlingSpan>$</BlingSpan>
-                          <form onSubmit={(e) => handleTerminalSubmit(e, t.id)} style={{ display: 'inline', flex: 1 }}>
+                          <form ref={el => termSubmitRefs.current[t.id] = el} onSubmit={(e) => handleTerminalSubmit(e, t.id)} style={{ display: 'inline', flex: 1 }}>
                             <TerminalInput2
                               id={inputId}
                               value={t.input}

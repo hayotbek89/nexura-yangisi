@@ -42,6 +42,60 @@ from nexura.verification import DomainVerification, extract_domain, is_private_t
 _chat_sessions: dict[str, list] = {}
 _verifier = DomainVerification()
 
+# Tool names for intent parsing
+_AVAILABLE_TOOLS = {"nmap", "nuclei", "nikto", "sqlmap", "amass", "whatweb", "gobuster", "wpscan"}
+
+
+def _parse_scan_intent(user_msg: str, ai_response: str) -> dict | None:
+    """Try to extract {tool, target} from user message or AI response.
+    Returns None if no clear tool+target pair is found.
+    """
+    combined = (ai_response + " " + user_msg).lower()
+
+    # Pick the best tool match (priority to tools mentioned in ai_response)
+    response_lower = ai_response.lower()
+    matched_tool = None
+    for t in _AVAILABLE_TOOLS:
+        if t in response_lower:
+            matched_tool = t
+            break
+    if not matched_tool:
+        for t in _AVAILABLE_TOOLS:
+            if t in combined:
+                matched_tool = t
+                break
+    if not matched_tool:
+        return None
+
+    # Extract target from user_msg (prefer URL, then domain, then IP)
+    target = None
+    url_m = re.search(r'(https?://[^\s]+)', user_msg)
+    if url_m:
+        target = url_m.group(1).rstrip("/")
+    if not target:
+        domain_m = re.search(r'([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}', user_msg)
+        if domain_m:
+            target = domain_m.group(0)
+    if not target:
+        ip_m = re.search(r'\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b', user_msg)
+        if ip_m:
+            target = ip_m.group(1)
+
+    if not target:
+        # Try AI response for target
+        url_m = re.search(r'(https?://[^\s]+)', ai_response)
+        if url_m:
+            target = url_m.group(1).rstrip("/")
+        if not target:
+            domain_m = re.search(r'([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}', ai_response)
+            if domain_m:
+                target = domain_m.group(0)
+
+    if not target:
+        return None
+
+    return {"tool": matched_tool, "target": target}
+
 logger = logging.getLogger(__name__)
 
 FRONTEND_DIST = config.PROJECT_ROOT / "FRONTEND" / "dist"
@@ -632,12 +686,20 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
     db.save_chat_message(sid, "user", req.message.strip(), ai_backend)
     db.save_chat_message(sid, "assistant", response_text, ai_backend)
 
+    # Try to extract automatic scan action from user msg + AI response
+    scan_action = None
+    if not n8n_result.get("error"):
+        parsed = _parse_scan_intent(req.message.strip(), response_text)
+        if parsed:
+            scan_action = parsed
+
     # Audit log
     await _log_scan_start(request.app.state, target or "unknown", request, f"{ai_backend} chat")
 
     return {
         "response": response_text,
         "scan_data": None,
+        "scan_action": scan_action,
     }
 
 

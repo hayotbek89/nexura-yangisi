@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useScanner } from '../ScannerContext'
-import { useWindowSize } from '../hooks/useWindowSize'
+
 import { apiFetch } from '../api'
 import styled, { keyframes } from 'styled-components'
 
@@ -34,6 +34,8 @@ const PanelWrapper = styled.div`
   will-change: transform, opacity;
   backface-visibility: hidden;
   perspective: 1000px;
+  overflow: hidden;
+  min-height: 0;
 `
 
 const dockBounce = keyframes`
@@ -45,16 +47,33 @@ const dockBounce = keyframes`
 `
 const PanelsContainer = styled.div`
   display: flex;
+  flex-direction: row;
   gap: 16px;
   width: 100%;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
   align-items: stretch;
-  flex-direction: ${props => props.$column ? 'column' : 'row'};
+  overflow: hidden;
+  @media (max-width: 1024px) {
+    flex-direction: column;
+    height: auto;
+    min-height: auto;
+    flex: none;
+  }
 `
 const Panel = styled.div`
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  @media (max-width: 1024px) {
+    height: 50vh;
+    flex: none;
+    min-height: 300px;
+  }
 `
 const Dock = styled.div`
   position: fixed;
@@ -229,6 +248,7 @@ const TerminalToolbar = styled.div`
   padding: 0 8px;
   background: #212121;
   justify-content: space-between;
+  flex-shrink: 0;
 `
 
 const Buttons = styled.div`
@@ -318,7 +338,12 @@ const OutputArea = styled.div`
   padding: 4px;
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #27c39f33 transparent;
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb { background: #27c39f55; border-radius: 2px; }
 `
 
 const OutputLine = styled.pre`
@@ -331,6 +356,7 @@ const OutputLine = styled.pre`
 
 const InputRow = styled.div`
   padding: 8px 4px 4px;
+  flex-shrink: 0;
 `
 
 const TerminalInput2 = styled.input`
@@ -379,9 +405,7 @@ function renderMarkdown(text) {
 
 export default function Scanner() {
   const { scanning, setScanning, setFindings, setReportUrl, setScanId,
-    chatLogs, setChatLogs, chatLoading, setChatLoading,
-    terminalLogs, setTerminalLogs, terminalLoading, setTerminalLoading } = useScanner()
-  const winWidth = useWindowSize()
+    chatLogs, setChatLogs, chatLoading, setChatLoading } = useScanner()
   
   // AI Chat States
   const [chatInput, setChatInput] = useState('')
@@ -458,10 +482,24 @@ export default function Scanner() {
     }).catch(() => {})
   }, [])
 
+  const appendToActiveTerminal = (lines) => {
+    setTerminals(prev => prev.map(t =>
+      t.id === activeTerminal
+        ? { ...t, logs: [...t.logs, ...(Array.isArray(lines) ? lines : [lines])] }
+        : t
+    ))
+  }
+
+  const setActiveTerminalLoading = (val) => {
+    setTerminals(prev => prev.map(t =>
+      t.id === activeTerminal ? { ...t, loading: val } : t
+    ))
+  }
+
   const runScanWithTool = async (target, tool) => {
     setQsLoading(true)
     setPendingTarget(null)
-    setTerminalLogs(prev => [...prev, `[NEXURA] ${tool.toUpperCase()} bilan ${target} skanerlanmoqda...`])
+    appendToActiveTerminal([`[NEXURA] ${tool.toUpperCase()} bilan ${target} skanerlanmoqda...`])
     try {
       const res = await apiFetch('/api/scan/select', {
         method: 'POST',
@@ -473,15 +511,14 @@ export default function Scanner() {
         throw new Error(errData.error || errData.detail || `Xatolik (${res.status})`)
       }
       const data = await res.json()
-      setTerminalLogs(prev => [...prev, `[NEXURA] Buyruq: ${data.command}`])
-      if (data.output) setTerminalLogs(prev => [...prev, data.output])
-      if (data.error_log) setTerminalLogs(prev => [...prev, `[STDERR]: ${data.error_log}`])
-      if (data.code !== 0 && !data.output) {
-        setTerminalLogs(prev => [...prev, `Exit code: ${data.code}`])
-      }
-      setTerminalLogs(prev => [...prev, `[NEXURA] ${tool.toUpperCase()} skanerlash yakunlandi`])
+      const lines = [`[NEXURA] Buyruq: ${data.command}`]
+      if (data.output) lines.push(data.output)
+      if (data.error_log) lines.push(`[STDERR]: ${data.error_log}`)
+      if (data.code !== 0 && !data.output) lines.push(`Exit code: ${data.code}`)
+      lines.push(`[NEXURA] ${tool.toUpperCase()} skanerlash yakunlandi`)
+      appendToActiveTerminal(lines)
     } catch (err) {
-      setTerminalLogs(prev => [...prev, `[ERROR]: ${err.message}`])
+      appendToActiveTerminal([`[ERROR]: ${err.message}`])
     }
     setQsLoading(false)
   }
@@ -489,12 +526,40 @@ export default function Scanner() {
   // Detect domain/IP/URL pattern for Option A
   const TARGET_RE = /([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|https?:\/\/[^\s]+/
 
-  // Terminal States
-  const [terminalInput, setTerminalInput] = useState('')
+  // Terminal States (multi-tab)
+  const [terminals, setTerminals] = useState([
+    { id: 'term_1', logs: [], loading: false, input: '' },
+  ])
+  const [activeTerminal, setActiveTerminal] = useState('term_1')
+  const termRefs = useRef({})
+
+  const activeTerm = terminals.find(t => t.id === activeTerminal) || terminals[0]
+  const setActiveTermData = (updater) => {
+    setTerminals(prev => prev.map(t =>
+      t.id === activeTerminal ? { ...updater(t) } : t
+    ))
+  }
+  const addTerminal = () => {
+    const id = 'term_' + Date.now() + '_' + Math.random().toString(36).slice(2, 4)
+    setTerminals(prev => [...prev, { id, logs: [], loading: false, input: '' }])
+    setActiveTerminal(id)
+  }
+  const closeTerminal = (id) => {
+    setTerminals(prev => {
+      const filtered = prev.filter(t => t.id !== id)
+      if (filtered.length === 0) {
+        const newId = 'term_' + Date.now()
+        return [{ id: newId, logs: [], loading: false, input: '' }]
+      }
+      return filtered
+    })
+    if (activeTerminal === id) {
+      setActiveTerminal(terminals.filter(t => t.id !== id)[0]?.id || terminals[0]?.id)
+    }
+  }
 
   // Refs for auto-scroll
   const chatEndRef = useRef(null)
-  const terminalEndRef = useRef(null)
 
   // Polling for AI status every 30s
   useEffect(() => {
@@ -584,8 +649,9 @@ export default function Scanner() {
   }, [chatLogs, chatLoading])
 
   useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [terminalLogs])
+    const ref = termRefs.current[activeTerminal]
+    if (ref) ref.scrollIntoView({ behavior: 'smooth' })
+  }, [activeTerminal, terminals])
 
   // Session management
   const switchSession = (sid) => {
@@ -680,6 +746,13 @@ export default function Scanner() {
         }
       }
 
+      // Auto-execute scan if AI detected tool + target
+      if (data.scan_action) {
+        const { tool, target: scanTarget } = data.scan_action
+        appendToActiveTerminal([`[NEXURA] AI ${tool.toUpperCase()} skanerlashni boshladi: ${scanTarget}`])
+        runScanWithTool(scanTarget, tool)
+      }
+
       setChatLogs(prev => [...prev, {
         role: 'ai',
         content: data.response,
@@ -699,23 +772,28 @@ export default function Scanner() {
   }
 
   // Submit command to secure web terminal
-  const handleTerminalSubmit = async (e) => {
+  const handleTerminalSubmit = async (e, termId) => {
     e.preventDefault()
-    if (!terminalInput.trim() || terminalLoading) return
+    const term = terminals.find(t => t.id === termId)
+    if (!term || !term.input.trim() || term.loading) return
 
-    const cmd = terminalInput.trim()
-    setTerminalInput('')
+    const cmd = term.input.trim()
+    setTerminals(prev => prev.map(t =>
+      t.id === termId ? { ...t, input: '' } : t
+    ))
     
-    // Add command to log
-    setTerminalLogs(prev => [...prev, `nexura@scanner:~$ ${cmd}`])
+    appendToTerminal(termId, [`nexura@scanner:~$ ${cmd}`])
     
-    // Handle local clear command
     if (cmd.toLowerCase() === 'clear') {
-      setTerminalLogs([])
+      setTerminals(prev => prev.map(t =>
+        t.id === termId ? { ...t, logs: [] } : t
+      ))
       return
     }
 
-    setTerminalLoading(true)
+    setTerminals(prev => prev.map(t =>
+      t.id === termId ? { ...t, loading: true } : t
+    ))
     
     try {
       const res = await apiFetch('/api/terminal', {
@@ -730,25 +808,30 @@ export default function Scanner() {
       }
 
       const data = await res.json()
-      
+      const lines = []
       if (data.error) {
-        setTerminalLogs(prev => [...prev, `[ERROR]: ${data.error}`])
+        lines.push(`[ERROR]: ${data.error}`)
       } else {
-        if (data.output) {
-          setTerminalLogs(prev => [...prev, data.output])
-        }
-        if (data.error_log) {
-          setTerminalLogs(prev => [...prev, `[STDERR]: ${data.error_log}`])
-        }
-        if (data.code !== 0 && !data.output) {
-          setTerminalLogs(prev => [...prev, `Exit code: ${data.code}`])
-        }
+        if (data.output) lines.push(data.output)
+        if (data.error_log) lines.push(`[STDERR]: ${data.error_log}`)
+        if (data.code !== 0 && !data.output) lines.push(`Exit code: ${data.code}`)
       }
+      appendToTerminal(termId, lines)
     } catch (err) {
-      setTerminalLogs(prev => [...prev, `[FAIL]: ${err.message}`])
+      appendToTerminal(termId, [`[FAIL]: ${err.message}`])
     } finally {
-      setTerminalLoading(false)
+      setTerminals(prev => prev.map(t =>
+        t.id === termId ? { ...t, loading: false } : t
+      ))
     }
+  }
+
+  const appendToTerminal = (termId, lines) => {
+    setTerminals(prev => prev.map(t =>
+      t.id === termId
+        ? { ...t, logs: [...t.logs, ...(Array.isArray(lines) ? lines : [lines])] }
+        : t
+    ))
   }
 
   return (
@@ -808,13 +891,11 @@ export default function Scanner() {
       {/* Main Split Grid */}
       <div style={{
         display: 'flex',
-        flexDirection: winWidth < 1024 ? 'column' : 'row',
-        gap: 20,
         flex: 1,
         minHeight: 0,
         overflow: 'hidden',
       }}>
-        <PanelsContainer $column={winWidth < 1024}>
+        <PanelsContainer>
           {/* LEFT COLUMN: AI Chat Assistant */}
           {!chatMinimized && (
             <Panel style={{ flex: terminalMinimized ? 2 : 1 }}>
@@ -907,6 +988,7 @@ export default function Scanner() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
+                    flexShrink: 0,
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                       <span onClick={handleMinimizeChat} style={{ width: 12, height: 12, borderRadius: '50%', background: '#ee411a', cursor: 'pointer', display: 'inline-block', transition: 'transform 0.15s' }}
@@ -970,6 +1052,7 @@ export default function Scanner() {
             flex: 1,
             padding: 16,
             overflowY: 'auto',
+            overflowX: 'hidden',
             display: 'flex',
             flexDirection: 'column',
             gap: 14,
@@ -1110,6 +1193,7 @@ export default function Scanner() {
                   padding: 12,
                   borderTop: '1px solid var(--border)',
                   background: 'var(--bg-card)',
+                  flexShrink: 0,
                 }}>
                   <StyledWrapper>
                     <div className="pb-ai-input-wrap">
@@ -1164,7 +1248,7 @@ export default function Scanner() {
             </Panel>
           )}
 
-          {/* RIGHT COLUMN: Terminal */}
+          {/* RIGHT COLUMN: Terminal (multi-tab) */}
           {!terminalMinimized && (
             <Panel style={{ flex: chatMinimized ? 2 : 1 }}>
               <PanelWrapper $closing={terminalClosing} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -1175,39 +1259,67 @@ export default function Scanner() {
                     <Dot />
                     <Dot />
                   </Buttons>
-                  <TabUser>00Kubi@admin: ~</TabUser>
-                  <AddTab>+</AddTab>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, overflow: 'hidden', margin: '0 8px' }}>
+                    {terminals.map(t => (
+                      <div key={t.id} onClick={() => setActiveTerminal(t.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          padding: '3px 10px', cursor: 'pointer', borderRadius: '4px 4px 0 0',
+                          fontSize: 12, color: t.id === activeTerminal ? '#fff' : '#888',
+                          background: t.id === activeTerminal ? 'rgba(255,255,255,0.08)' : 'transparent',
+                          borderBottom: t.id === activeTerminal ? '1px solid #27c39f' : '1px solid transparent',
+                          transition: 'all 0.15s', whiteSpace: 'nowrap',
+                        }}>
+                        <span>#{terminals.indexOf(t) + 1}</span>
+                        {terminals.length > 1 && (
+                          <span onClick={(e) => { e.stopPropagation(); closeTerminal(t.id) }}
+                            style={{ fontSize: 10, opacity: 0.5, cursor: 'pointer', marginLeft: 2 }}>
+                            ✕
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <AddTab onClick={addTerminal}>+</AddTab>
                 </TerminalToolbar>
                 <TerminalBody>
-                  <Prompt>
-                    <UserSpan>00Kubi@admin:</UserSpan>
-                    <LocationSpan>~</LocationSpan>
-                    <BlingSpan>$</BlingSpan>
-                    <Cursor />
-                  </Prompt>
-                  <OutputArea>
-                    {terminalLogs.length === 0 && !terminalLoading && (
-                      <OutputLine $log="">Welcome to NEXURA Security Terminal</OutputLine>
-                    )}
-                    {terminalLogs.map((log, idx) => (
-                      <OutputLine key={idx} $log={log}>{log}</OutputLine>
-                    ))}
-                    {terminalLoading && (
-                      <OutputLine $log="">Buyruq bajarilmoqda, kuting...</OutputLine>
-                    )}
-                    <div ref={terminalEndRef} />
-                  </OutputArea>
-                  <InputRow>
-                    <form onSubmit={handleTerminalSubmit}>
-                      <TerminalInput2
-                        value={terminalInput}
-                        onChange={e => setTerminalInput(e.target.value)}
-                        placeholder="nmap -F target.com"
-                        disabled={terminalLoading}
-                        autoFocus
-                      />
-                    </form>
-                  </InputRow>
+                  {terminals.map(t => (
+                    <div key={t.id} style={{ display: t.id === activeTerminal ? 'flex' : 'none', flex: 1, flexDirection: 'column', minHeight: 0 }}>
+                      <Prompt>
+                        <UserSpan>00Kubi@admin:</UserSpan>
+                        <LocationSpan>~</LocationSpan>
+                        <BlingSpan>$</BlingSpan>
+                        <Cursor />
+                      </Prompt>
+                      <OutputArea>
+                        {t.logs.length === 0 && !t.loading && (
+                          <OutputLine $log="">Welcome to NEXURA Security Terminal #{terminals.indexOf(t) + 1}</OutputLine>
+                        )}
+                        {t.logs.map((log, idx) => (
+                          <OutputLine key={idx} $log={log}>{log}</OutputLine>
+                        ))}
+                        {t.loading && (
+                          <OutputLine $log="">Buyruq bajarilmoqda, kuting...</OutputLine>
+                        )}
+                        <div ref={el => termRefs.current[t.id] = el} />
+                      </OutputArea>
+                      <InputRow>
+                        <form onSubmit={(e) => handleTerminalSubmit(e, t.id)}>
+                          <TerminalInput2
+                            value={t.input}
+                            onChange={e => {
+                              setTerminals(prev => prev.map(term =>
+                                term.id === t.id ? { ...term, input: e.target.value } : term
+                              ))
+                            }}
+                            placeholder="nmap -F target.com"
+                            disabled={t.loading}
+                            autoFocus
+                          />
+                        </form>
+                      </InputRow>
+                    </div>
+                  ))}
                 </TerminalBody>
               </TerminalBox>
               </PanelWrapper>

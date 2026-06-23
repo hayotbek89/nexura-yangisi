@@ -298,21 +298,7 @@ const TerminalBody = styled.div`
   overflow: hidden;
 `
 
-const PromptSpan = styled.span`
-  margin-left: 4px;
-`
 
-const UserSpan = styled(PromptSpan)`
-  color: #1eff8e;
-`
-
-const LocationSpan = styled(PromptSpan)`
-  color: #4878c0;
-`
-
-const BlingSpan = styled(PromptSpan)`
-  color: #ddd;
-`
 
 const OutputArea = styled.div`
   padding: 4px;
@@ -1284,11 +1270,11 @@ export default function Scanner() {
                         {t.loading && (
                           <OutputLine $log="">Buyruq bajarilmoqda, kuting...</OutputLine>
                         )}
-                        <div style={{ display: 'flex', alignItems: 'center', padding: '4px 0' }}>
-                          <UserSpan style={{marginLeft:4}}>00Kubi@admin:</UserSpan>
-                          <LocationSpan>~</LocationSpan>
-                          <BlingSpan>$</BlingSpan>
-                          <form ref={el => termSubmitRefs.current[t.id] = el} onSubmit={(e) => handleTerminalSubmit(e, t.id)} style={{ display: 'inline', flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', padding: '4px 0', whiteSpace: 'nowrap' }}>
+                          <span style={{marginLeft:4,color:'#1eff8e'}}>00Kubi@admin:</span>
+                          <span style={{marginLeft:4,color:'#4878c0'}}>~</span>
+                          <span style={{marginLeft:4,color:'#ddd'}}>$</span>
+                          <form ref={el => termSubmitRefs.current[t.id] = el} onSubmit={(e) => handleTerminalSubmit(e, t.id)} style={{ display: 'flex', flex: 1, minWidth: 0 }}>
                             <TerminalInput2
                               id={inputId}
                               value={t.input}
@@ -1300,7 +1286,6 @@ export default function Scanner() {
                               placeholder="nmap -F target.com"
                               disabled={t.loading}
                               autoFocus
-                              style={{ width: '100%' }}
                             />
                           </form>
                         </div>

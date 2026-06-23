@@ -340,7 +340,7 @@ const TerminalInput2 = styled.input`
   background: transparent;
   border: none;
   color: #e6e6e6;
-  caret-color: #1eff8e;
+  caret-color: #e6e6e6;
   outline: none;
   font-family: Menlo, Consolas, monospace;
   font-size: 12px;

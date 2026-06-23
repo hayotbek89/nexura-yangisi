@@ -366,7 +366,10 @@ function renderMarkdown(text) {
 
 export default function Scanner() {
   const { scanning, setScanning, setFindings, setReportUrl, setScanId,
-    chatLogs, setChatLogs, chatLoading, setChatLoading } = useScanner()
+    chatLogs, setChatLogs, chatLoading, setChatLoading,
+    terminals, setTerminals, activeTerminal, setActiveTerminal,
+    terminalScrolledUp, setTerminalScrolledUp,
+    appendToTerminal, addTerminal, closeTerminal } = useScanner()
   
   // AI Chat States
   const [chatInput, setChatInput] = useState('')
@@ -487,37 +490,10 @@ export default function Scanner() {
   // Detect domain/IP/URL pattern for Option A
   const TARGET_RE = /([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|https?:\/\/[^\s]+/
 
-  // Terminal States (multi-tab)
-  const [terminals, setTerminals] = useState([
-    { id: 'term_1', logs: [], loading: false, input: '' },
-  ])
-  const [activeTerminal, setActiveTerminal] = useState('term_1')
+  // Terminal refs
   const termRefs = useRef({})
 
   const activeTerm = terminals.find(t => t.id === activeTerminal) || terminals[0]
-  const setActiveTermData = (updater) => {
-    setTerminals(prev => prev.map(t =>
-      t.id === activeTerminal ? { ...updater(t) } : t
-    ))
-  }
-  const addTerminal = () => {
-    const id = 'term_' + Date.now() + '_' + Math.random().toString(36).slice(2, 4)
-    setTerminals(prev => [...prev, { id, logs: [], loading: false, input: '' }])
-    setActiveTerminal(id)
-  }
-  const closeTerminal = (id) => {
-    setTerminals(prev => {
-      const filtered = prev.filter(t => t.id !== id)
-      if (filtered.length === 0) {
-        const newId = 'term_' + Date.now()
-        return [{ id: newId, logs: [], loading: false, input: '' }]
-      }
-      return filtered
-    })
-    if (activeTerminal === id) {
-      setActiveTerminal(terminals.filter(t => t.id !== id)[0]?.id || terminals[0]?.id)
-    }
-  }
 
   // Refs for auto-scroll
   const chatEndRef = useRef(null)
@@ -610,7 +586,6 @@ export default function Scanner() {
   }, [chatLogs, chatLoading])
 
   // Smart auto-scroll: only scroll down if user is already near bottom
-  const [terminalScrolledUp, setTerminalScrolledUp] = useState({})
   const handleTerminalScroll = (termId, e) => {
     const el = e.currentTarget
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
@@ -796,12 +771,8 @@ export default function Scanner() {
     }
   }
 
-  const appendToTerminal = (termId, lines) => {
-    setTerminals(prev => prev.map(t =>
-      t.id === termId
-        ? { ...t, logs: [...t.logs, ...(Array.isArray(lines) ? lines : [lines])] }
-        : t
-    ))
+  const appendToActiveTerminal = (lines) => {
+    appendToTerminal(activeTerminal, lines)
   }
 
   return (

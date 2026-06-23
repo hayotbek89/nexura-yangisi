@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
+import { apiFetch } from './api';
 
 const ScannerContext = createContext();
 
@@ -25,12 +26,39 @@ export const ScannerProvider = ({ children }) => {
 
   const [chatLogs, setChatLogs] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
-  const [terminalLogs, setTerminalLogs] = useState([
-    'NEXURA Secure Scanner Terminal v2.0.0',
-    'Ruxsat etilgan buyruqlar: nmap, nuclei, nikto, sqlmap, gobuster, amass, whatweb, ping, nslookup, dig, traceroute, ls, dir, pwd',
-    'Tizim tayyor. Buyruqni kiriting...',
+
+  // Terminal multi-tab state (persists across navigation)
+  const [terminals, setTerminals] = useState([
+    { id: 'term_1', logs: [], loading: false, input: '' },
   ]);
-  const [terminalLoading, setTerminalLoading] = useState(false);
+  const [activeTerminal, setActiveTerminal] = useState('term_1');
+  const [terminalScrolledUp, setTerminalScrolledUp] = useState({});
+
+  const appendToTerminal = useCallback((termId, lines) => {
+    setTerminals(prev => prev.map(t =>
+      t.id === termId
+        ? { ...t, logs: [...t.logs, ...(Array.isArray(lines) ? lines : [lines])] }
+        : t
+    ))
+  }, [])
+
+  const addTerminal = useCallback(() => {
+    const id = 'term_' + Date.now() + '_' + Math.random().toString(36).slice(2, 4)
+    setTerminals(prev => [...prev, { id, logs: [], loading: false, input: '' }])
+    setActiveTerminal(id)
+  }, [])
+
+  const closeTerminal = useCallback((id) => {
+    setTerminals(prev => {
+      const filtered = prev.filter(t => t.id !== id)
+      if (filtered.length === 0) {
+        const newId = 'term_' + Date.now()
+        return [{ id: newId, logs: [], loading: false, input: '' }]
+      }
+      return filtered
+    })
+    setTerminalScrolledUp(prev => { const n = {...prev}; delete n[id]; return n })
+  }, [])
 
   const value = {
     url, setUrl,
@@ -45,8 +73,12 @@ export const ScannerProvider = ({ children }) => {
     agentic, setAgentic,
     chatLogs, setChatLogs,
     chatLoading, setChatLoading,
-    terminalLogs, setTerminalLogs,
-    terminalLoading, setTerminalLoading,
+    terminals, setTerminals,
+    activeTerminal, setActiveTerminal,
+    terminalScrolledUp, setTerminalScrolledUp,
+    appendToTerminal,
+    addTerminal,
+    closeTerminal,
   };
 
   return (

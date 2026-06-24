@@ -933,22 +933,49 @@ export default function Scanner() {
                         ? s.first_msg.replace('T', ' ').slice(0, 16)
                         : `Chat ${i + 1}`
                       return (
-                        <div key={s.session_id} onClick={() => switchSession(s.session_id)} style={{
-                          padding: '10px 12px',
-                          cursor: 'pointer',
+                        <div key={s.session_id} style={{
+                          display: 'flex', alignItems: 'center',
                           background: isActive ? 'rgba(24,95,165,0.15)' : 'transparent',
                           borderLeft: isActive ? '3px solid var(--primary)' : '3px solid transparent',
-                          fontSize: 12,
-                          color: isActive ? 'var(--primary)' : 'var(--text)',
-                          fontWeight: isActive ? 600 : 400,
                           transition: 'all 0.15s',
                         }}>
-                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {label}
+                          <div onClick={() => switchSession(s.session_id)} style={{
+                            flex: 1, padding: '10px 8px', cursor: 'pointer',
+                            fontSize: 12, color: isActive ? 'var(--primary)' : 'var(--text)',
+                            fontWeight: isActive ? 600 : 400, minWidth: 0,
+                          }}>
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {label}
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                              {s.msg_count} xabar
+                            </div>
                           </div>
-                          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                            {s.msg_count} xabar
-                          </div>
+                          <button onClick={async (e) => {
+                            e.stopPropagation()
+                            if (!confirm(`"${label}" chatni o'chirishni tasdiqlaysizmi?`)) return
+                            try {
+                              await apiFetch(`/api/chat/history?session_id=${encodeURIComponent(s.session_id)}`, { method: 'DELETE' })
+                              setChatSessions(prev => prev.filter(x => x.session_id !== s.session_id))
+                              if (s.session_id === chatSessionId) {
+                                localStorage.removeItem('nexura_chat_session')
+                                setChatSessionId('')
+                                setChatLogs([])
+                              }
+                            } catch (err) {
+                              console.error('Chat session delete failed:', err)
+                            }
+                          }} style={{
+                            background: 'none', border: 'none', color: '#ef4444',
+                            cursor: 'pointer', padding: '4px 8px', fontSize: 12,
+                            opacity: 0.5, flexShrink: 0,
+                            display: isActive ? 'block' : 'none',
+                          }}
+                            onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                            onMouseLeave={e => e.currentTarget.style.opacity = '0.5'}
+                          >
+                            ✕
+                          </button>
                         </div>
                       )
                     })}

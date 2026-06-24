@@ -240,6 +240,13 @@ class ChatRequest(BaseModel):
     session_id: str = Field(default="default", max_length=100)
 
 
+class AnalyzeRequest(BaseModel):
+    scan_output: str = Field(max_length=50000)
+    tool: str = Field(max_length=50)
+    target: str = Field(max_length=500)
+    session_id: str = Field(default="default", max_length=100)
+
+
 class QuickScanRequest(BaseModel):
     target: str = Field(max_length=500)
 
@@ -701,6 +708,41 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
         "response": response_text,
         "scan_data": None,
         "scan_action": scan_action,
+    }
+
+
+@app.post("/api/chat/analyze")
+async def analyze_scan_result(req: AnalyzeRequest, request: Request, _=Depends(_verify_token)):
+    scan_output = req.scan_output
+    tool = req.tool
+    target = req.target
+    sid = req.session_id
+
+    analysis_prompt = (
+        f"Siz professional kiberxavfsizlik mutaxassisi sifatida quyidagi skanerlash natijasini tahlil qiling.\n\n"
+        f"Vosita: {tool.upper()}\n"
+        f"Nishon: {target}\n\n"
+        f"Natija:\n{scan_output}\n\n"
+        f"Iltimos, o'zbek tilida quyidagilarni tushuntiring:\n"
+        f"1. Topilgan ochiq portlar va ularning xavf darajasi\n"
+        f"2. Aniqlangan xizmatlar va versiyalar\n"
+        f"3. Potentsial zaifliklar\n"
+        f"4. Konkret xavfsizlik tavsiyalari\n"
+        f"5. Umumiy xavfsizlik bahosi (past/o'rta/yuqori xavf)\n\n"
+        f"Markdown formatida, jadvallar bilan chiroyli format qiling."
+    )
+
+    n8n_result = await send_to_n8n(analysis_prompt)
+    analysis = n8n_result.get("response", "Tahlil olinmadi")
+
+    db = request.app.state.history_db
+    db.save_chat_message(sid, "assistant", f"🔍 **{tool.upper()} skanerlash tahlili — {target}**\n\n{analysis}", "n8n_analysis")
+
+    return {
+        "analysis": analysis,
+        "tool": tool,
+        "target": target,
+        "timestamp": datetime.now().isoformat(),
     }
 
 

@@ -716,6 +716,8 @@ export default function Scanner() {
     }
   }
 
+  const SCAN_TOOLS = ['nmap', 'nuclei', 'nikto', 'sqlmap', 'gobuster', 'whatweb', 'amass']
+
   // Submit command to secure web terminal
   const handleTerminalSubmit = async (e, termId) => {
     e.preventDefault()
@@ -754,14 +756,48 @@ export default function Scanner() {
 
       const data = await res.json()
       const lines = []
+      let fullOutput = ''
       if (data.error) {
         lines.push(`[ERROR]: ${data.error}`)
+        fullOutput = data.error
       } else {
         if (data.output) lines.push(data.output)
         if (data.error_log) lines.push(`[STDERR]: ${data.error_log}`)
         if (data.code !== 0 && !data.output) lines.push(`Exit code: ${data.code}`)
+        fullOutput = [data.output, data.error_log].filter(Boolean).join('\n')
       }
       appendToTerminal(termId, lines)
+
+      // Detect scan command → send to Claude for analysis
+      const firstWord = cmd.split(/\s+/)[0]?.toLowerCase()
+      if (fullOutput && SCAN_TOOLS.includes(firstWord)) {
+        let sid = chatSessionId
+        if (!sid) {
+          sid = 'chat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
+          localStorage.setItem('nexura_chat_session', sid)
+          setChatSessionId(sid)
+        }
+        try {
+          const analyzeRes = await apiFetch('/api/chat/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              scan_output: fullOutput.slice(0, 30000),
+              tool: firstWord,
+              target: cmd.split(/\s+/).slice(-1)[0],
+              session_id: sid,
+            }),
+          })
+          if (analyzeRes.ok) {
+            const analyzeData = await analyzeRes.json()
+            setChatLogs(prev => [...prev, {
+              role: 'ai',
+              content: `🔍 **${firstWord.toUpperCase()} skanerlash tahlili — ${analyzeData.target}**\n\n${analyzeData.analysis}`,
+              timestamp: new Date(),
+            }])
+          }
+        } catch (_) {}
+      }
     } catch (err) {
       appendToTerminal(termId, [`[FAIL]: ${err.message}`])
     } finally {

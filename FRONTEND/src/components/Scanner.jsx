@@ -792,7 +792,7 @@ export default function Scanner() {
             const analyzeData = await analyzeRes.json()
             setChatLogs(prev => [...prev, {
               role: 'ai',
-              content: `🔍 **${firstWord.toUpperCase()} skanerlash tahlili — ${analyzeData.target}**\n\n${analyzeData.analysis}`,
+              content: analyzeData.analysis,
               timestamp: new Date(),
             }])
           }

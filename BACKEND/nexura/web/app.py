@@ -735,11 +735,13 @@ async def analyze_scan_result(req: AnalyzeRequest, request: Request, _=Depends(_
     n8n_result = await send_to_n8n(analysis_prompt)
     analysis = n8n_result.get("response", "Tahlil olinmadi")
 
+    full_msg = f"🔍 **{tool.upper()} skanerlash tahlili — {target}**\n\n{analysis}"
+
     db = request.app.state.history_db
-    db.save_chat_message(sid, "assistant", f"🔍 **{tool.upper()} skanerlash tahlili — {target}**\n\n{analysis}", "n8n_analysis")
+    db.save_chat_message(sid, "assistant", full_msg, "n8n_analysis")
 
     return {
-        "analysis": analysis,
+        "analysis": full_msg,
         "tool": tool,
         "target": target,
         "timestamp": datetime.now().isoformat(),

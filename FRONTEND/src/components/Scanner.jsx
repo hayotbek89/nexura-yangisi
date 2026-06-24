@@ -934,18 +934,38 @@ export default function Scanner() {
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
                       Chatlar
                     </span>
-                    <button onClick={createNewSession} style={{
-                      background: 'var(--primary)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 4,
-                      padding: '4px 8px',
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}>
-                      + Yangi
-                    </button>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {chatSessions.length > 0 && (
+                        <button onClick={async () => {
+                          if (!confirm('Barcha chatlarni o\'chirishni tasdiqlaysizmi?')) return
+                          for (const s of chatSessions) {
+                            try { await apiFetch(`/api/chat/history?session_id=${encodeURIComponent(s.session_id)}`, { method: 'DELETE' }) } catch (_) {}
+                          }
+                          setChatSessions([])
+                          localStorage.removeItem('nexura_chat_session')
+                          setChatSessionId('')
+                          setChatLogs([])
+                        }} style={{
+                          background: 'rgba(239,68,68,0.15)', color: '#ef4444',
+                          border: 'none', borderRadius: 4, padding: '4px 8px',
+                          fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}>
+                          ✕ Hammasi
+                        </button>
+                      )}
+                      <button onClick={createNewSession} style={{
+                        background: 'var(--primary)',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 4,
+                        padding: '4px 8px',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}>
+                        + Yangi
+                      </button>
+                    </div>
                   </div>
                   <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
                     {chatSessions.length === 0 && (
@@ -964,7 +984,11 @@ export default function Scanner() {
                           background: isActive ? 'rgba(24,95,165,0.15)' : 'transparent',
                           borderLeft: isActive ? '3px solid var(--primary)' : '3px solid transparent',
                           transition: 'all 0.15s',
-                        }}>
+                          position: 'relative',
+                        }}
+                          onMouseEnter={e => { const btn = e.currentTarget.querySelector('.chat-del-btn'); if (btn) btn.style.opacity = '1' }}
+                          onMouseLeave={e => { const btn = e.currentTarget.querySelector('.chat-del-btn'); if (btn) btn.style.opacity = '0' }}
+                        >
                           <div onClick={() => switchSession(s.session_id)} style={{
                             flex: 1, padding: '10px 8px', cursor: 'pointer',
                             fontSize: 12, color: isActive ? 'var(--primary)' : 'var(--text)',
@@ -977,9 +1001,8 @@ export default function Scanner() {
                               {s.msg_count} xabar
                             </div>
                           </div>
-                          <button onClick={async (e) => {
+                          <button className="chat-del-btn" onClick={async (e) => {
                             e.stopPropagation()
-                            if (!confirm(`"${label}" chatni o'chirishni tasdiqlaysizmi?`)) return
                             try {
                               await apiFetch(`/api/chat/history?session_id=${encodeURIComponent(s.session_id)}`, { method: 'DELETE' })
                               setChatSessions(prev => prev.filter(x => x.session_id !== s.session_id))
@@ -992,14 +1015,11 @@ export default function Scanner() {
                               console.error('Chat session delete failed:', err)
                             }
                           }} style={{
-                            background: 'none', border: 'none', color: '#ef4444',
-                            cursor: 'pointer', padding: '4px 8px', fontSize: 12,
-                            opacity: 0.5, flexShrink: 0,
-                            display: isActive ? 'block' : 'none',
-                          }}
-                            onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                            onMouseLeave={e => e.currentTarget.style.opacity = '0.5'}
-                          >
+                            background: 'rgba(239,68,68,0.15)', border: 'none', color: '#ef4444',
+                            cursor: 'pointer', padding: '4px 6px', fontSize: 11, borderRadius: 4,
+                            opacity: 0, flexShrink: 0, marginRight: 4, transition: 'opacity 0.15s',
+                            fontWeight: 600,
+                          }}>
                             ✕
                           </button>
                         </div>

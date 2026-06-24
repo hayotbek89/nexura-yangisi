@@ -364,6 +364,8 @@ function renderMarkdown(text) {
   return <span dangerouslySetInnerHTML={{ __html: html }} />
 }
 
+const MAX_CHATS = 20
+
 export default function Scanner() {
   const { scanning, setScanning, setFindings, setReportUrl, setScanId,
     chatLogs, setChatLogs, chatLoading, setChatLoading,
@@ -387,6 +389,9 @@ export default function Scanner() {
   const [terminalJustMinimized, setTerminalJustMinimized] = useState(false)
   const [mouseX, setMouseX] = useState(null)
   const dockRef = useRef(null)
+  const [toast, setToast] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
+  const [deletingIds, setDeletingIds] = useState([])
 
   const handleDockMouseMove = (e) => {
     const rect = dockRef.current.getBoundingClientRect()
@@ -605,7 +610,24 @@ export default function Scanner() {
     setShowSidebar(false)
   }
 
+  const showToast = (msg) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2500)
+  }
+
+  // Enforce 20-chat limit: remove oldest if at max
+  const enforceChatLimit = (prev) => {
+    if (prev.length >= MAX_CHATS) {
+      const oldest = prev[0]
+      apiFetch(`/api/chat/history?session_id=${encodeURIComponent(oldest.session_id)}`, { method: 'DELETE' }).catch(() => {})
+      showToast('Chatlar soni chegarasi (20) — eng eski chat o\'chirildi')
+      return prev.slice(1)
+    }
+    return prev
+  }
+
   const createNewSession = () => {
+    setChatSessions(prev => enforceChatLimit(prev))
     const sid = 'chat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
     localStorage.setItem('nexura_chat_session', sid)
     setChatSessionId(sid)
@@ -837,6 +859,47 @@ export default function Scanner() {
     appendToTerminal(activeTerminal, lines)
   }
 
+  // Confirm delete handler
+  const handleConfirmDelete = async () => {
+    if (!confirmDelete) return
+    const { label, session_id } = confirmDelete
+    setConfirmDelete(null)
+
+    if (session_id === '__all__') {
+      setDeletingIds(chatSessions.map(s => s.session_id))
+      setTimeout(async () => {
+        for (const s of chatSessions) {
+          try { await apiFetch(`/api/chat/history?session_id=${encodeURIComponent(s.session_id)}`, { method: 'DELETE' }) } catch (_) {}
+        }
+        setChatSessions([])
+        setDeletingIds([])
+        localStorage.removeItem('nexura_chat_session')
+        setChatSessionId('')
+        setChatLogs([])
+        showToast('Barcha chatlar o\'chirildi')
+      }, 300)
+      return
+    }
+
+    setDeletingIds(prev => [...prev, session_id])
+    setTimeout(async () => {
+      try {
+        await apiFetch(`/api/chat/history?session_id=${encodeURIComponent(session_id)}`, { method: 'DELETE' })
+        setChatSessions(prev => prev.filter(x => x.session_id !== session_id))
+        setDeletingIds(prev => prev.filter(id => id !== session_id))
+        if (session_id === chatSessionId) {
+          localStorage.removeItem('nexura_chat_session')
+          setChatSessionId('')
+          setChatLogs([])
+        }
+        showToast(`"${label}" chat o'chirildi`)
+      } catch (err) {
+        setDeletingIds(prev => prev.filter(id => id !== session_id))
+        showToast('Xatolik yuz berdi')
+      }
+    }, 300)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16, paddingBottom: 80, overflow: 'hidden', minHeight: 0 }}>
       {/* Title Header */}
@@ -936,21 +999,12 @@ export default function Scanner() {
                     </span>
                     <div style={{ display: 'flex', gap: 4 }}>
                       {chatSessions.length > 0 && (
-                        <button onClick={async () => {
-                          if (!confirm('Barcha chatlarni o\'chirishni tasdiqlaysizmi?')) return
-                          for (const s of chatSessions) {
-                            try { await apiFetch(`/api/chat/history?session_id=${encodeURIComponent(s.session_id)}`, { method: 'DELETE' }) } catch (_) {}
-                          }
-                          setChatSessions([])
-                          localStorage.removeItem('nexura_chat_session')
-                          setChatSessionId('')
-                          setChatLogs([])
-                        }} style={{
+                        <button onClick={() => setConfirmDelete({ label: null, session_id: '__all__' })} style={{
                           background: 'rgba(239,68,68,0.15)', color: '#ef4444',
                           border: 'none', borderRadius: 4, padding: '4px 8px',
                           fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
                         }}>
-                          ✕ Hammasi
+                          🗑️
                         </button>
                       )}
                       <button onClick={createNewSession} style={{
@@ -978,13 +1032,19 @@ export default function Scanner() {
                       const label = s.first_msg
                         ? s.first_msg.replace('T', ' ').slice(0, 16)
                         : `Chat ${i + 1}`
+                      const isDeleting = deletingIds.includes(s.session_id)
                       return (
                         <div key={s.session_id} style={{
                           display: 'flex', alignItems: 'center',
                           background: isActive ? 'rgba(24,95,165,0.15)' : 'transparent',
                           borderLeft: isActive ? '3px solid var(--primary)' : '3px solid transparent',
-                          transition: 'all 0.15s',
+                          transition: 'all 0.3s ease',
                           position: 'relative',
+                          opacity: isDeleting ? 0 : 1,
+                          transform: isDeleting ? 'translateX(-100%)' : 'translateX(0)',
+                          maxHeight: isDeleting ? 0 : 60,
+                          overflow: 'hidden',
+                          marginBottom: isDeleting ? 0 : 0,
                         }}
                           onMouseEnter={e => { const btn = e.currentTarget.querySelector('.chat-del-btn'); if (btn) btn.style.opacity = '1' }}
                           onMouseLeave={e => { const btn = e.currentTarget.querySelector('.chat-del-btn'); if (btn) btn.style.opacity = '0' }}
@@ -1001,26 +1061,16 @@ export default function Scanner() {
                               {s.msg_count} xabar
                             </div>
                           </div>
-                          <button className="chat-del-btn" onClick={async (e) => {
-                            e.stopPropagation()
-                            try {
-                              await apiFetch(`/api/chat/history?session_id=${encodeURIComponent(s.session_id)}`, { method: 'DELETE' })
-                              setChatSessions(prev => prev.filter(x => x.session_id !== s.session_id))
-                              if (s.session_id === chatSessionId) {
-                                localStorage.removeItem('nexura_chat_session')
-                                setChatSessionId('')
-                                setChatLogs([])
-                              }
-                            } catch (err) {
-                              console.error('Chat session delete failed:', err)
-                            }
-                          }} style={{
+                          <button className="chat-del-btn" onClick={() => setConfirmDelete({
+                            label,
+                            session_id: s.session_id,
+                          })} style={{
                             background: 'rgba(239,68,68,0.15)', border: 'none', color: '#ef4444',
-                            cursor: 'pointer', padding: '4px 6px', fontSize: 11, borderRadius: 4,
+                            cursor: 'pointer', padding: '4px 6px', fontSize: 13, borderRadius: 4,
                             opacity: 0, flexShrink: 0, marginRight: 4, transition: 'opacity 0.15s',
-                            fontWeight: 600,
+                            fontWeight: 600, lineHeight: 1,
                           }}>
-                            ✕
+                            🗑️
                           </button>
                         </div>
                       )
@@ -1415,6 +1465,62 @@ export default function Scanner() {
           </DockItem>
         )}
       </Dock>
+
+      {/* Confirm Delete Modal */}
+      {confirmDelete && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          animation: 'fadeIn 0.2s ease',
+        }} onClick={() => setConfirmDelete(null)}>
+          <div style={{
+            background: '#1a1a2e', border: '1px solid #ef4444', borderRadius: 12,
+            padding: 24, maxWidth: 360, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 28, textAlign: 'center', marginBottom: 12 }}>🗑️</div>
+            <div style={{ fontSize: 15, fontWeight: 600, textAlign: 'center', marginBottom: 8, color: '#e6e6e6' }}>
+              {confirmDelete.session_id === '__all__'
+                ? 'Barcha chatlarni o\'chirmoqchimisiz?'
+                : `"${confirmDelete.label}" chatni o'chirmoqchimisiz?`}
+            </div>
+            <div style={{ fontSize: 12, color: '#999', textAlign: 'center', marginBottom: 20 }}>
+              Bu amalni qaytarib bo'lmaydi
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button onClick={() => setConfirmDelete(null)} style={{
+                padding: '10px 24px', borderRadius: 8, border: '1px solid #333',
+                background: 'transparent', color: '#ccc', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}>Bekor qilish</button>
+              <button onClick={handleConfirmDelete} style={{
+                padding: '10px 24px', borderRadius: 8, border: 'none',
+                background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}>O'chirish</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 9998,
+          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+          border: '1px solid #27c39f', borderRadius: 8, padding: '10px 20px',
+          fontSize: 13, color: '#e6e6e6', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          animation: 'fadeIn 0.2s ease',
+          maxWidth: '90%', textAlign: 'center',
+        }}>
+          {toast}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   )
 }

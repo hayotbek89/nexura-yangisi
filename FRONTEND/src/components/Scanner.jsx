@@ -718,6 +718,36 @@ export default function Scanner() {
 
   const SCAN_TOOLS = ['nmap', 'nuclei', 'nikto', 'sqlmap', 'gobuster', 'whatweb', 'amass']
 
+  // Poll a scan job until completion, then add analysis to chat
+  const pollScanJob = async (scanId, tool) => {
+    let attempts = 0
+    const maxAttempts = 120
+    const poll = async () => {
+      try {
+        const res = await apiFetch(`/api/analyze/status/${scanId}`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.status === 'completed') {
+          setChatLogs(prev => [...prev, {
+            role: 'ai', content: data.analysis || `${tool.toUpperCase()} skanerlash yakunlandi`,
+            timestamp: new Date(),
+          }])
+          return
+        }
+        if (data.status === 'error') {
+          setChatLogs(prev => [...prev, {
+            role: 'ai', content: `❌ ${tool.toUpperCase()} skanerlash xatosi: ${data.error}`,
+            timestamp: new Date(),
+          }])
+          return
+        }
+      } catch (_) {}
+      attempts++
+      if (attempts < maxAttempts) setTimeout(poll, 2000)
+    }
+    setTimeout(poll, 1000)
+  }
+
   // Submit command to secure web terminal
   const handleTerminalSubmit = async (e, termId) => {
     e.preventDefault()
@@ -768,7 +798,7 @@ export default function Scanner() {
       }
       appendToTerminal(termId, lines)
 
-      // Detect scan command → send to Claude for analysis
+      // Detect scan command → start async analysis + polling
       const firstWord = cmd.split(/\s+/)[0]?.toLowerCase()
       if (fullOutput && SCAN_TOOLS.includes(firstWord)) {
         let sid = chatSessionId
@@ -778,7 +808,7 @@ export default function Scanner() {
           setChatSessionId(sid)
         }
         try {
-          const analyzeRes = await apiFetch('/api/chat/analyze', {
+          const startRes = await apiFetch('/api/analyze/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -788,13 +818,9 @@ export default function Scanner() {
               session_id: sid,
             }),
           })
-          if (analyzeRes.ok) {
-            const analyzeData = await analyzeRes.json()
-            setChatLogs(prev => [...prev, {
-              role: 'ai',
-              content: analyzeData.analysis,
-              timestamp: new Date(),
-            }])
+          if (startRes.ok) {
+            const { scan_id } = await startRes.json()
+            if (scan_id) pollScanJob(scan_id, firstWord)
           }
         } catch (_) {}
       }
@@ -1014,21 +1040,24 @@ export default function Scanner() {
                     }}>
                       ☰
                     </button>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>NEXURA AI Assistant</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                        <span style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: '50%',
-                          background: modelLoaded ? '#22c55e' : '#f59e0b',
-                          display: 'inline-block'
-                        }} />
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {modelLoaded ? 'Online' : 'Offline'}
-                        </span>
-                      </div>
-                    </div>
+      <div>
+        <div style={{ fontWeight: 700, fontSize: 14 }}>NEXURA AI Assistant</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+          <span style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: modelLoaded ? '#22c55e' : '#f59e0b',
+            display: 'inline-block'
+          }} />
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {modelLoaded ? 'Online' : 'Offline'}
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.6, marginLeft: 4 }}>
+            n8n:5678
+          </span>
+        </div>
+      </div>
                     {scanning && (
                       <span style={{
                         marginLeft: 'auto',

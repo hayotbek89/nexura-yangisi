@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import asyncio
 import base64
 import json
+import uuid
 import logging
 import os
 import shutil
@@ -38,9 +39,12 @@ from nexura.scanners.network import NetworkScanner
 from nexura.tool_selector import ToolSelector
 from nexura.verification import DomainVerification, extract_domain, is_private_target
 
-# In-memory conversation store: session_id -> list of messages
+# In-memory stores
 _chat_sessions: dict[str, list] = {}
 _verifier = DomainVerification()
+
+# Async scan job store: scan_id -> { status, output, error, tool, target }
+_scan_jobs: dict[str, dict] = {}
 
 # Tool names for intent parsing
 _AVAILABLE_TOOLS = {"nmap", "nuclei", "nikto", "sqlmap", "amass", "whatweb", "gobuster", "wpscan"}
@@ -408,6 +412,7 @@ async def status(request: Request):
         "ai_ready": n8n_configured,
         "model_loaded": n8n_configured,
         "ai_backend": "n8n" if n8n_configured else "none",
+        "n8n_webhook_url": config.N8N_WEBHOOK_URL or "",
         "tools": _check_tools(),
     }
 
@@ -711,41 +716,83 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
     }
 
 
-@app.post("/api/chat/analyze")
-async def analyze_scan_result(req: AnalyzeRequest, request: Request, _=Depends(_verify_token)):
-    scan_output = req.scan_output
-    tool = req.tool
+# ── Async scan job worker ──
+async def _run_scan_job(scan_id: str, target: str, tool: str, cmd: str):
+    """Background worker: execute tool command, then send to n8n for analysis."""
+    _scan_jobs[scan_id] = {"status": "running", "output": "", "error": "", "tool": tool, "target": target}
+    try:
+        cmd_args = shlex.split(cmd)
+        binary = cmd_args[0]
+        binary_path = config.TOOL_PATHS.get(binary) or shutil.which(binary)
+        if not binary_path:
+            _scan_jobs[scan_id] = {**_scan_jobs[scan_id], "status": "error", "error": f"'{binary}' topilmadi"}
+            return
+        proc = await asyncio.create_subprocess_exec(
+            binary_path, *cmd_args[1:],
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            env=config.get_env(),
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=config.TIMEOUT)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            _scan_jobs[scan_id] = {**_scan_jobs[scan_id], "status": "error", "error": f"Timeout ({config.TIMEOUT}s)"}
+            return
+
+        raw_output = stdout.decode("utf-8", errors="replace") if stdout else ""
+        raw_err = stderr.decode("utf-8", errors="replace") if stderr else ""
+        _scan_jobs[scan_id]["output"] = raw_output
+        _scan_jobs[scan_id]["error_log"] = raw_err
+
+        # Send raw output to n8n Claude for analysis
+        analysis_prompt = (
+            f"Sen cybersecurity eksperti. Terminal natijasini tahlil qil va oddiy tilda tushuntir. "
+            f"Xavfli zaifliklarni ajratib ko'rsat. Tavsiyalar ber. O'zbek tilida javob ber.\n\n"
+            f"Vosita: {tool.upper()}\nNishon: {target}\n\nNatija:\n{raw_output[:30000]}"
+        )
+        n8n_result = await send_to_n8n(analysis_prompt)
+        analysis = n8n_result.get("response", "Tahlil olinmadi")
+        _scan_jobs[scan_id]["analysis"] = f"🔍 **{tool.upper()} skanerlash tahlili — {target}**\n\n{analysis}"
+        _scan_jobs[scan_id]["status"] = "completed"
+    except Exception as e:
+        _scan_jobs[scan_id] = {**_scan_jobs[scan_id], "status": "error", "error": str(e)}
+
+
+@app.post("/api/analyze/start")
+async def start_scan_analysis(req: AnalyzeRequest, request: Request, _=Depends(_verify_token)):
+    """Start a scan job and return immediately with scan_id. Frontend polls /api/analyze/status/{scan_id}."""
     target = req.target
-    sid = req.session_id
+    tool = req.tool
 
-    analysis_prompt = (
-        f"Siz professional kiberxavfsizlik mutaxassisi sifatida quyidagi skanerlash natijasini tahlil qiling.\n\n"
-        f"Vosita: {tool.upper()}\n"
-        f"Nishon: {target}\n\n"
-        f"Natija:\n{scan_output}\n\n"
-        f"Iltimos, o'zbek tilida quyidagilarni tushuntiring:\n"
-        f"1. Topilgan ochiq portlar va ularning xavf darajasi\n"
-        f"2. Aniqlangan xizmatlar va versiyalar\n"
-        f"3. Potentsial zaifliklar\n"
-        f"4. Konkret xavfsizlik tavsiyalari\n"
-        f"5. Umumiy xavfsizlik bahosi (past/o'rta/yuqori xavf)\n\n"
-        f"Markdown formatida, jadvallar bilan chiroyli format qiling."
-    )
+    # Build command from template
+    template = TOOL_TEMPLATES.get(tool)
+    if not template:
+        return JSONResponse(status_code=400, content={"error": f"'{tool}' uchun buyruq shabloni yo'q"})
+    clean = _clean_target(target, tool)
+    cmd = template.format(target=target, host=clean)
 
-    n8n_result = await send_to_n8n(analysis_prompt)
-    analysis = n8n_result.get("response", "Tahlil olinmadi")
+    scan_id = str(uuid.uuid4())[:8]
+    _scan_jobs[scan_id] = {"status": "queued", "output": "", "error": "", "tool": tool, "target": target}
 
-    full_msg = f"🔍 **{tool.upper()} skanerlash tahlili — {target}**\n\n{analysis}"
+    asyncio.create_task(_run_scan_job(scan_id, target, tool, cmd))
 
-    db = request.app.state.history_db
-    db.save_chat_message(sid, "assistant", full_msg, "n8n_analysis")
+    return {"scan_id": scan_id, "status": "queued", "tool": tool, "target": target}
 
-    return {
-        "analysis": full_msg,
-        "tool": tool,
-        "target": target,
-        "timestamp": datetime.now().isoformat(),
-    }
+
+@app.get("/api/analyze/status/{scan_id}")
+async def get_scan_analysis_status(scan_id: str, _=Depends(_verify_token)):
+    """Poll this endpoint to get scan progress and final analysis."""
+    job = _scan_jobs.get(scan_id)
+    if not job:
+        return JSONResponse(status_code=404, content={"error": "Scan job topilmadi"})
+    resp = {"scan_id": scan_id, "status": job.get("status"), "tool": job.get("tool"), "target": job.get("target")}
+    if job["status"] == "completed":
+        resp["analysis"] = job.get("analysis", "")
+        resp["output"] = job.get("output", "")
+    elif job["status"] == "error":
+        resp["error"] = job.get("error", "")
+    return resp
 
 
 @app.get("/api/chat/history")

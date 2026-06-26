@@ -9,6 +9,15 @@ from nexura import config
 logger = logging.getLogger(__name__)
 
 
+SYSTEM_PROMPT = (
+    "Siz NEXURA AI Security Scanner yordamchisisiz. "
+    "Sizning vazifangiz kiberxavfsizlik bo'yicha yordam berish."
+    "FAQAT O'ZBEK TILIDA javob bering. Hech qachon ingliz tilida javob bermang. "
+    "Agar foydalanuvchi boshqa tilda so'rasa ham, siz o'zbek tilida javob berishingiz kerak. "
+    "Professional cybersecurity mutaxassisi sifatida xavfsizlik maslahatlari bering."
+)
+
+
 async def ask_ollama(message: str) -> dict:
     base_url = config.OLLAMA_BASE_URL
     model = config.OLLAMA_MODEL
@@ -23,18 +32,22 @@ async def ask_ollama(message: str) -> dict:
     try:
         async with httpx.AsyncClient(timeout=config.OLLAMA_TIMEOUT) as client:
             resp = await client.post(
-                f"{base_url.rstrip('/')}/api/generate",
+                f"{base_url.rstrip('/')}/api/chat",
                 json={
                     "model": model,
-                    "prompt": message,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": message},
+                    ],
                     "stream": False,
                 },
                 headers={"Content-Type": "application/json"},
             )
             resp.raise_for_status()
             data = resp.json()
+            msg = data.get("message", {})
             return {
-                "response": data.get("response", "Javob olinmadi"),
+                "response": msg.get("content", "Javob olinmadi"),
                 "error": False,
             }
     except httpx.TimeoutException:

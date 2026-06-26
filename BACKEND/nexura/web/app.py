@@ -760,8 +760,8 @@ async def _run_scan_job(scan_id: str, target: str, tool: str, cmd: str):
 
         # Send raw output to n8n Claude for analysis
         analysis_prompt = (
-            f"Sen cybersecurity eksperti. Terminal natijasini tahlil qil va oddiy tilda tushuntir. "
-            f"Xavfli zaifliklarni ajratib ko'rsat. Tavsiyalar ber. O'zbek tilida javob ber.\n\n"
+            f"Terminal natijasini tahlil qil va oddiy tilda tushuntir. "
+            f"Xavfli zaifliklarni ajratib ko'rsat. Tavsiyalar ber. "
             f"Vosita: {tool.upper()}\nNishon: {target}\n\nNatija:\n{raw_output[:30000]}"
         )
         ai_result = await ask_ollama(analysis_prompt)

@@ -31,6 +31,7 @@ from nexura import config
 from nexura.ai_engine import AIEngine
 from nexura.cve_lookup import CVELookup
 from nexura.n8n_client import send_to_n8n
+from nexura.github_client import create_repo_from_findings, scan_repo
 from nexura.history_db import HistoryDB
 from nexura.models.schemas import ScanResult, Vulnerability
 from nexura.report.generator import ReportGenerator
@@ -793,6 +794,45 @@ async def get_scan_analysis_status(scan_id: str, _=Depends(_verify_token)):
     elif job["status"] == "error":
         resp["error"] = job.get("error", "")
     return resp
+
+
+# ── GitHub Integration ──
+
+class GitHubExportRequest(BaseModel):
+    token: str = Field(max_length=200)
+    repo_name: str = Field(max_length=100)
+    session_id: str = Field(default="", max_length=100)
+
+
+class GitHubScanRequest(BaseModel):
+    token: str = Field(max_length=200)
+    repo_url: str = Field(max_length=500)
+
+
+@app.post("/api/github/export")
+async def github_export(req: GitHubExportRequest, request: Request, _=Depends(_verify_token)):
+    findings = []
+    target = "unknown"
+    tool = "nmap"
+    if req.session_id:
+        loop = asyncio.get_event_loop()
+        session = await loop.run_in_executor(None, request.app.state.history_db.get_session, req.session_id)
+        if session:
+            target = session.get("target", target)
+            findings = session.get("vulnerabilities", []) or session.get("ai_analysis", [])
+            tools = session.get("tools", [])
+            if tools:
+                tool = tools[0] if isinstance(tools[0], str) else tools[0].get("tool", tool)
+    if not findings:
+        return JSONResponse(status_code=400, content={"error": "Eksport qilish uchun zaifliklar topilmadi"})
+    result = await create_repo_from_findings(req.token, req.repo_name, findings, target, tool)
+    return result
+
+
+@app.post("/api/github/scan-repo")
+async def github_scan_repo(req: GitHubScanRequest, _=Depends(_verify_token)):
+    result = await scan_repo(req.token, req.repo_url)
+    return result
 
 
 @app.get("/api/chat/history")

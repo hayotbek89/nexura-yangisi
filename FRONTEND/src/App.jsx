@@ -8,6 +8,7 @@ import Scanner from './components/Scanner'
 import History from './components/History'
 import Reports from './components/Reports'
 import Settings from './components/Settings'
+import GitHub from './components/GitHub'
 import BackgroundPattern from './components/BackgroundPattern'
 import AccessKeyGate from './components/AccessKeyGate'
 import TermsOfServiceModal from './components/TermsOfServiceModal'
@@ -80,6 +81,7 @@ export default function App() {
             {page === 'scanner' && <Scanner />}
             {page === 'history' && <History />}
             {page === 'reports' && <Reports />}
+            {page === 'github' && <GitHub />}
             {page === 'settings' && <Settings />}
           </div>
         </ErrorBoundary>

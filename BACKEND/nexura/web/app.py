@@ -539,6 +539,12 @@ TOOLS_META = [
 
 import re as _re
 
+def _validate_target(target: str) -> str | None:
+    if _INTERNAL_RE.search(target):
+        return "Xavfsizlik: serverning o'zini skanerlash mumkin emas"
+    return None
+
+
 def _clean_target(target: str, tool: str) -> str:
     # Strip URL scheme
     host = _re.sub(r'^https?://', '', target)
@@ -580,7 +586,11 @@ async def list_tools(_=Depends(_verify_token)):
 async def scan_with_selected_tool(req: ScanSelectRequest, request: Request, _=Depends(_verify_token)):
     tool = req.tool.strip().lower()
     target = req.target.strip()
-    
+
+    valid_err = _validate_target(target)
+    if valid_err:
+        return JSONResponse(status_code=400, content={"error": valid_err})
+
     if not config.is_tool_available(tool):
         return JSONResponse(status_code=400, content={"error": f"'{tool}' dasturi serverda topilmadi"})
     
@@ -767,6 +777,10 @@ async def start_scan_analysis(req: AnalyzeRequest, request: Request, _=Depends(_
     """Start a scan job and return immediately with scan_id. Frontend polls /api/analyze/status/{scan_id}."""
     target = req.target
     tool = req.tool
+
+    valid_err = _validate_target(target)
+    if valid_err:
+        return JSONResponse(status_code=400, content={"error": valid_err})
 
     # Build command from template
     template = TOOL_TEMPLATES.get(tool)
@@ -1190,8 +1204,73 @@ ALLOWED_TERMINAL_COMMANDS = frozenset({
     "ping", "nslookup", "dig", "traceroute", "tracert", "ls", "dir", "pwd"
 })
 
+# ── Security filters ──
+
+VPS_IPS = {"127.0.0.1", "localhost", "0.0.0.0", "185.191.141.247", "::1"}
+RATE_LIMIT_STORE: dict[str, list[float]] = {}
+RATE_LIMIT_MAX = 10
+RATE_LIMIT_WINDOW = 60
+
+
+def _rate_limit(ip: str) -> str | None:
+    now = __import__("time").time()
+    window = RATE_LIMIT_STORE.setdefault(ip, [])
+    window[:] = [t for t in window if now - t < RATE_LIMIT_WINDOW]
+    if len(window) >= RATE_LIMIT_MAX:
+        return f"Juda ko'p so'rov ({RATE_LIMIT_MAX} ta / {RATE_LIMIT_WINDOW} soniya). Keyinroq urinib ko'ring."
+    window.append(now)
+    return None
+
+
+_INTERNAL_RE = re.compile(
+    r"(?i)\b(127\.\d{1,3}\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|localhost|::1|0\.0\.0\.0|185\.191\.141\.247)\b"
+)
+
+_DANGEROUS_NMAP_FLAGS = re.compile(r"--script\b|--script-args\b|-oA\b|-oN\b|-oX\b|-oS\b|-oG\b|--datadir\b|--servicedb\b|--versiondb\b|--iflist\b|--resume\b|-\s*e\b")
+_DANGEROUS_NUCLEI_FLAGS = re.compile(r"--template\b|-t\b|--system-templates\b|--update-templates\b|--code\b|--json-export\b|--markdown-export\b")
+
+
+def _validate_cmd_safety(binary_clean: str, cmd_args: list[str], full_cmd: str) -> str | None:
+    full_lower = full_cmd.lower()
+
+    # 1. Block targeting internal/VPS IPs
+    if _INTERNAL_RE.search(full_cmd):
+        return "Xavfsizlik: serverning o'zini skanerlash mumkin emas"
+
+    # 2. Block dangerous nmap flags
+    if binary_clean == "nmap" and _DANGEROUS_NMAP_FLAGS.search(full_lower):
+        return "Xavfsizlik: nmap --script va boshqa xavfli flag'lar bloklangan"
+
+    # 3. Block dangerous nuclei flags
+    if binary_clean == "nuclei" and _DANGEROUS_NUCLEI_FLAGS.search(full_lower):
+        return "Xavfsizlik: nuclei custom template'lar bloklangan"
+
+    # 4. Limit nslookup/dig count (max 2 targets)
+    if binary_clean in ("nslookup", "dig") and len(cmd_args) > 3:
+        return "Xavfsizlik: nslookup/dig faqat bitta nishon bilan cheklangan"
+
+    # 5. Block massive port ranges in nmap
+    if binary_clean == "nmap":
+        for arg in cmd_args:
+            if arg.startswith("-p") and arg != "-p-":
+                parts = arg.lstrip("-p")
+                if "-" in parts:
+                    start, end = parts.split("-", 1)
+                    if start.isdigit() and end.isdigit():
+                        if int(end) - int(start) > 10000:
+                            return "Xavfsizlik: port diapazoni 10000 dan oshmasligi kerak"
+
+    return None
+
+
 @app.post("/api/terminal")
 async def run_terminal(req: TerminalRequest, request: Request, _=Depends(_verify_token)):
+    # Rate limit
+    ip = request.client.host if request.client else "unknown"
+    rate_err = _rate_limit(ip)
+    if rate_err:
+        return {"output": "", "error": rate_err, "code": -1}
+
     cmd = req.cmd.strip()
     if not cmd:
         return {"output": "", "error": "Bo'sh buyruq", "code": -1}
@@ -1228,7 +1307,12 @@ async def run_terminal(req: TerminalRequest, request: Request, _=Depends(_verify
             return {"output": "", "error": "Bo'sh buyruq", "code": -1}
         binary = cmd_args[0]
         binary_clean = binary.lower().lstrip(".").rstrip(".exe")
-    
+
+    # Safety validation
+    safety_err = _validate_cmd_safety(binary_clean, cmd_args, cmd)
+    if safety_err:
+        return {"output": "", "error": safety_err, "code": 1}
+
     if binary_clean not in ALLOWED_TERMINAL_COMMANDS:
         return {
             "output": "",

@@ -63,8 +63,29 @@ TRANSLATE_PROMPT_TEMPLATE = (
 )
 
 
-async def _translate(text: str, target_lang: str, client: httpx.AsyncClient) -> str:
-    """Translate text to target language using Ollama."""
+async def _translate_n8n(text: str, target_lang: str) -> str | None:
+    """Translate using n8n webhook."""
+    if not config.N8N_TRANSLATE_URL:
+        return None
+    lang_names = {"uz": "Uzbek", "ru": "Russian", "en": "English"}
+    target = lang_names.get(target_lang, "Uzbek")
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                config.N8N_TRANSLATE_URL,
+                json={"text": text, "target_language": target},
+                headers={"Content-Type": "application/json"},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                return data.get("response") or data.get("translated") or data.get("text")
+    except Exception:
+        pass
+    return None
+
+
+async def _translate_ollama(text: str, target_lang: str, client: httpx.AsyncClient) -> str:
+    """Fallback translation using Ollama itself."""
     if target_lang == "en":
         return text
     lang_names = {"uz": "Uzbek", "ru": "Russian"}
@@ -127,7 +148,10 @@ async def ask_ollama(message: str) -> dict:
             if user_lang != "en":
                 detected_response_lang = _detect_lang(response_text)
                 if detected_response_lang != user_lang:
-                    translated = await _translate(response_text, user_lang, client)
+                    # Try n8n translate first, fallback to Ollama self-translate
+                    translated = await _translate_n8n(response_text, user_lang)
+                    if not translated:
+                        translated = await _translate_ollama(response_text, user_lang, client)
                     if translated != response_text:
                         response_text = translated
 

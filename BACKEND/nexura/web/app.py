@@ -19,6 +19,8 @@ import socket
 
 import re
 
+import httpx
+
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -30,7 +32,7 @@ from pydantic import BaseModel, Field
 from nexura import config
 from nexura.ai_engine import AIEngine
 from nexura.cve_lookup import CVELookup
-from nexura.ollama_client import ask_ollama
+from nexura.ollama_client import ask_ollama, _translate_n8n, _translate_ollama
 from nexura.github_client import create_repo_from_findings, scan_repo
 from nexura.history_db import HistoryDB
 from nexura.models.schemas import ScanResult, Vulnerability
@@ -727,6 +729,24 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
         "scan_data": None,
         "scan_action": scan_action,
     }
+
+
+class TranslateRequest(BaseModel):
+    text: str
+    target_language: str = "Uzbek"
+
+
+@app.post("/api/translate")
+async def translate_endpoint(req: TranslateRequest, request: Request, _=Depends(_verify_token)):
+    """Translate text via n8n webhook or fallback Ollama."""
+    lang_map = {"uzbek": "uz", "russian": "ru", "english": "en"}
+    target = lang_map.get(req.target_language.lower(), "uz")
+    # Try n8n first
+    translated = await _translate_n8n(req.text, target)
+    if not translated:
+        async with httpx.AsyncClient(timeout=30) as client:
+            translated = await _translate_ollama(req.text, target, client)
+    return {"original": req.text, "translated": translated, "target_language": req.target_language}
 
 
 # ── Async scan job worker ──

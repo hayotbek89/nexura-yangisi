@@ -27,6 +27,10 @@ WRN_TEMP = float(os.getenv("WRN_TEMP", "0.3"))
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "")
 N8N_TIMEOUT = int(os.getenv("N8N_TIMEOUT", "300"))
 
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:mini")
+OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))
+
 WEB_HOST = os.getenv("NEXURA_WEB_HOST", "0.0.0.0")
 WEB_PORT = int(os.getenv("NEXURA_WEB_PORT", "8080"))
 

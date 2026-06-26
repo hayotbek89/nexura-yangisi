@@ -64,9 +64,9 @@ def client():
 
 
 class TestAPIChat:
-    @patch("nexura.web.app.send_to_n8n")
-    def test_chat_basic(self, mock_send, client):
-        mock_send.return_value = {"response": "Salom! Qanday yordam kerak?", "error": False}
+    @patch("nexura.web.app.ask_ollama")
+    def test_chat_basic(self, mock_ask, client):
+        mock_ask.return_value = {"response": "Salom! Qanday yordam kerak?", "error": False}
         resp = client.post("/api/chat", json={
             "message": "salom",
             "session_id": "test-session",
@@ -76,14 +76,14 @@ class TestAPIChat:
         assert "Salom" in data["response"]
         assert data["scan_data"] is None
 
-    @patch("nexura.web.app.send_to_n8n")
-    def test_chat_n8n_error(self, mock_send, client):
-        mock_send.return_value = {"response": "n8n xatosi", "error": True}
+    @patch("nexura.web.app.ask_ollama")
+    def test_chat_ollama_error(self, mock_ask, client):
+        mock_ask.return_value = {"response": "Ollama xatosi", "error": True}
         resp = client.post("/api/chat", json={
             "message": "salom",
         })
         assert resp.status_code == 200
-        assert "n8n xatosi" in resp.json()["response"]
+        assert "Ollama xatosi" in resp.json()["response"]
 
 
 class TestAPIStatus:

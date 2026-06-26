@@ -1124,7 +1124,7 @@ export default function Scanner() {
             {modelLoaded ? 'Online' : 'Offline'}
           </span>
           <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.6, marginLeft: 4 }}>
-            n8n:5678
+            ollama
           </span>
         </div>
       </div>

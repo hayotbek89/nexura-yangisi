@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 from nexura import config
 from nexura.ai_engine import AIEngine
 from nexura.cve_lookup import CVELookup
-from nexura.n8n_client import send_to_n8n
+from nexura.ollama_client import ask_ollama
 from nexura.github_client import create_repo_from_findings, scan_repo
 from nexura.history_db import HistoryDB
 from nexura.models.schemas import ScanResult, Vulnerability
@@ -406,14 +406,16 @@ async def quick_scan(req: QuickScanRequest, request: Request, _=Depends(_verify_
 
 @app.get("/api/status")
 async def status(request: Request):
-    n8n_configured = bool(config.N8N_WEBHOOK_URL)
+    ollama_url = config.OLLAMA_BASE_URL or ""
+    ai_ready = bool(ollama_url)
     return {
         "name": "Nexura Scanner",
         "version": "2.0.0",
-        "ai_ready": n8n_configured,
-        "model_loaded": n8n_configured,
-        "ai_backend": "n8n" if n8n_configured else "none",
-        "n8n_webhook_url": config.N8N_WEBHOOK_URL or "",
+        "ai_ready": ai_ready,
+        "model_loaded": ai_ready,
+        "ai_backend": f"ollama/{config.OLLAMA_MODEL}" if ai_ready else "none",
+        "ollama_url": ollama_url,
+        "ollama_model": config.OLLAMA_MODEL,
         "tools": _check_tools(),
     }
 
@@ -597,8 +599,8 @@ async def scan_with_selected_tool(req: ScanSelectRequest, request: Request, _=De
             f"Aynan shu vosita uchun to'g'ri terminal buyrug'ini yoz. "
             f"Javobda FAQAT buyruq matni bo'lsin, boshqa hech narsa qo'shma."
         )
-        n8n_result = await send_to_n8n(prompt)
-        resp = n8n_result.get("response", "").strip().strip("`").strip()
+        ai_result = await ask_ollama(prompt)
+        resp = ai_result.get("response", "").strip().strip("`").strip()
         if resp and resp.lower().startswith(tool.lower()):
             command = resp
     except Exception:
@@ -691,10 +693,10 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
         elif ip_match:
             target = ip_match.group(1)
 
-    # Send to n8n Claude AI Agent (send_to_n8n handles errors gracefully)
-    n8n_result = await send_to_n8n(req.message.strip())
-    ai_backend = "n8n"
-    response_text = n8n_result["response"]
+    # Send to local Ollama Phi-3 mini
+    ai_result = await ask_ollama(req.message.strip())
+    ai_backend = "ollama"
+    response_text = ai_result["response"]
 
     # Save to persistent DB
     db.save_chat_message(sid, "user", req.message.strip(), ai_backend)
@@ -702,7 +704,7 @@ async def chat_endpoint(req: ChatRequest, request: Request, _=Depends(_verify_to
 
     # Try to extract automatic scan action from user msg + AI response
     scan_action = None
-    if not n8n_result.get("error"):
+    if not ai_result.get("error"):
         parsed = _parse_scan_intent(req.message.strip(), response_text)
         if parsed:
             scan_action = parsed
@@ -752,8 +754,8 @@ async def _run_scan_job(scan_id: str, target: str, tool: str, cmd: str):
             f"Xavfli zaifliklarni ajratib ko'rsat. Tavsiyalar ber. O'zbek tilida javob ber.\n\n"
             f"Vosita: {tool.upper()}\nNishon: {target}\n\nNatija:\n{raw_output[:30000]}"
         )
-        n8n_result = await send_to_n8n(analysis_prompt)
-        analysis = n8n_result.get("response", "Tahlil olinmadi")
+        ai_result = await ask_ollama(analysis_prompt)
+        analysis = ai_result.get("response", "Tahlil olinmadi")
         _scan_jobs[scan_id]["analysis"] = f"🔍 **{tool.upper()} skanerlash tahlili — {target}**\n\n{analysis}"
         _scan_jobs[scan_id]["status"] = "completed"
     except Exception as e:

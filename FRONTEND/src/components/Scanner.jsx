@@ -1363,6 +1363,7 @@ export default function Scanner() {
                     <Dot />
                   </Buttons>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, overflow: 'hidden', margin: '0 8px' }}>
+                    <img src="/terminal.png" alt="terminal" style={{ width: 18, height: 18, objectFit: 'contain' }} />
                     {terminals.map(t => (
                       <div key={t.id} onClick={() => setActiveTerminal(t.id)}
                         style={{

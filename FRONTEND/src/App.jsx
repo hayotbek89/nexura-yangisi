@@ -12,6 +12,7 @@ import GitHub from './components/GitHub'
 import BackgroundPattern from './components/BackgroundPattern'
 import AccessKeyGate from './components/AccessKeyGate'
 import TermsOfServiceModal from './components/TermsOfServiceModal'
+import TerminalToggle from './components/TerminalToggle'
 import './App.css'
 
 export default function App() {
@@ -86,6 +87,7 @@ export default function App() {
           </div>
         </ErrorBoundary>
       </ScannerProvider>
+      <TerminalToggle />
     </ThemeProvider>
   )
 }

@@ -1461,7 +1461,7 @@ export default function Scanner() {
             $justAdded={terminalJustMinimized}
             onClick={handleRestoreTerminal}
           >
-            <DockIcon>⌨</DockIcon>
+            <DockIcon><img src="/terminal.png" alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} /></DockIcon>
             <span>Terminal</span>
           </DockItem>
         )}

@@ -112,10 +112,17 @@ async def _translate_ollama(text: str, target_lang: str, client: httpx.AsyncClie
 
 
 async def ask_ollama(message: str) -> dict:
-    base_url = config.OLLAMA_BASE_URL
     model = config.OLLAMA_MODEL
 
-    if not base_url:
+    # Build URL list: GPU tunnel (11435) first, then VPS CPU (configured)
+    base = config.OLLAMA_BASE_URL.rstrip("/")
+    urls = [base]
+    # Add tunnel URL as preferred if different from configured
+    tunnel_url = base.replace(":11434", ":11435")
+    if tunnel_url != base and tunnel_url not in urls:
+        urls.insert(0, tunnel_url)
+
+    if not base:
         return {
             "response": "AI integratsiyasi sozlanmagan. "
                         "OLLAMA_BASE_URL ni .env fayliga qo'shing.",
@@ -125,55 +132,51 @@ async def ask_ollama(message: str) -> dict:
     user_lang = _detect_lang(message)
     system_prompt = _build_system_prompt(user_lang)
 
-    try:
-        async with httpx.AsyncClient(timeout=config.OLLAMA_TIMEOUT) as client:
-            resp = await client.post(
-                f"{base_url.rstrip('/')}/api/chat",
-                json={
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": message},
-                    ],
-                    "stream": False,
-                },
-                headers={"Content-Type": "application/json"},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            msg = data.get("message", {})
-            response_text = msg.get("content", "Javob olinmadi")
+    last_error = None
+    for url in urls:
+        try:
+            async with httpx.AsyncClient(timeout=config.OLLAMA_TIMEOUT) as client:
+                resp = await client.post(
+                    f"{url}/api/chat",
+                    json={
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": message},
+                        ],
+                        "stream": False,
+                    },
+                    headers={"Content-Type": "application/json"},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                msg = data.get("message", {})
+                response_text = msg.get("content", "Javob olinmadi")
 
             # If user asked in Uzbek/Russian but AI responded in English, translate
             if user_lang != "en":
                 detected_response_lang = _detect_lang(response_text)
                 if detected_response_lang != user_lang:
-                    # Try n8n translate first, fallback to Ollama self-translate
                     translated = await _translate_n8n(response_text, user_lang)
                     if not translated:
                         translated = await _translate_ollama(response_text, user_lang, client)
                     if translated != response_text:
                         response_text = translated
 
-            return {
-                "response": response_text,
-                "error": False,
-            }
-    except httpx.TimeoutException:
+            return {"response": response_text, "error": False}
+        except Exception as e:
+            last_error = e
+            logger.warning("Ollama %s ishlamadi: %s", url, e)
+
+    # All URLs failed — return last error
+    if isinstance(last_error, httpx.TimeoutException):
         return {
             "response": "AI javob berishda juda uzoq vaqt oldi "
                         f"({config.OLLAMA_TIMEOUT} soniyadan ortiq). "
                         "Qaytadan urinib ko'ring.",
             "error": True,
         }
-    except httpx.HTTPStatusError as e:
-        return {
-            "response": f"Ollama bilan aloqa xatosi: {e.response.status_code}",
-            "error": True,
-        }
-    except Exception as e:
-        logger.error("ollama client error: %s", e, exc_info=True)
-        return {
-            "response": f"Kutilmagan xato: {str(e)}",
-            "error": True,
-        }
+    if isinstance(last_error, httpx.HTTPStatusError):
+        return {"response": f"Ollama bilan aloqa xatosi: {last_error.response.status_code}", "error": True}
+    logger.error("ollama client error: %s", last_error, exc_info=True)
+    return {"response": f"Kutilmagan xato: {str(last_error)}", "error": True}

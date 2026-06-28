@@ -145,11 +145,14 @@ export default function Sidebar({ page, onNavigate, menuOpen, onToggle, onLogout
             border: '1px solid #e74c3c',
             color: '#e74c3c',
             fontFamily: 'monospace',
-            fontSize: '11px',
-            letterSpacing: '2px',
-            padding: '8px 12px',
+            fontSize: '10px',
+            letterSpacing: '1px',
+            padding: '8px 10px',
             cursor: 'pointer',
             width: '100%',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
           }}>
             API KALITNI TOZALASH
           </button>

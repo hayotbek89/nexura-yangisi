@@ -178,6 +178,104 @@ const StyledWrapper = styled.div`
   }
 `;
 
+const TerminalBox = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  font-family: Menlo, Consolas, monospace;
+  font-size: 14px;
+  color: #e6e6e6;
+  border-radius: 5px;
+  overflow: hidden;
+`
+
+const TerminalToolbar = styled.div`
+  display: flex;
+  height: 30px;
+  align-items: center;
+  padding: 0 8px;
+  background: #212121;
+  justify-content: space-between;
+  flex-shrink: 0;
+`
+
+const Buttons = styled.div`
+  display: flex;
+  align-items: center;
+`
+
+const Dot = styled.button`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  margin-right: 5px;
+  font-size: 8px;
+  height: 12px;
+  width: 12px;
+  border: none;
+  border-radius: 100%;
+  background: ${p => p.$color || 'linear-gradient(#7d7871 0%, #595953 100%)'};
+  cursor: pointer;
+`
+
+const AddTab = styled.div`
+  border: 1px solid #fff;
+  color: #fff;
+  padding: 0 6px;
+  border-radius: 4px 4px 0 0;
+  border-bottom: none;
+  cursor: pointer;
+`
+
+const TerminalBody = styled.div`
+  background: rgba(0, 0, 0, 0.6);
+  flex: 1;
+  padding-top: 2px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+`
+
+const OutputArea = styled.div`
+  padding: 4px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #27c39f33 transparent;
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb { background: #27c39f55; border-radius: 2px; }
+`
+
+const OutputLine = styled.pre`
+  margin: 0;
+  color: ${p =>
+    p.$log?.startsWith('nexura@scanner') ? '#38bdf8' :
+    p.$log?.startsWith('[ERROR]') || p.$log?.startsWith('[FAIL]') ? '#ef4444' :
+    p.$log?.startsWith('[STDERR]') ? '#f59e0b' : '#e6e6e6'};
+`
+
+
+
+const TerminalInput2 = styled.input`
+  width: 100%;
+  padding: 6px;
+  background: transparent;
+  border: none;
+  color: #e6e6e6;
+  caret-color: #e6e6e6;
+  outline: none;
+  font-family: Menlo, Consolas, monospace;
+  font-size: 12px;
+
+  &::placeholder { color: rgba(255,255,255,0.2); }
+`
+
 // Simple helper to format basic markdown (bold, lists, code blocks) safely into HTML
 function renderMarkdown(text) {
   if (!text) return ''
@@ -212,7 +310,9 @@ const MAX_CHATS = 20
 
 export default function Scanner() {
   const { scanning, setScanning, setFindings, setReportUrl, setScanId,
-    chatLogs, setChatLogs, chatLoading, setChatLoading } = useScanner()
+    chatLogs, setChatLogs, chatLoading, setChatLoading,
+    chatMinimized, setChatMinimized, chatClosing, setChatClosing,
+    terminalVisible, setTerminalVisible, terminalClosing, setTerminalClosing } = useScanner()
   
   // AI Chat States
   const [chatInput, setChatInput] = useState('')
@@ -222,26 +322,115 @@ export default function Scanner() {
     return localStorage.getItem('nexura_chat_session') || ''
   })
   const [showSidebar, setShowSidebar] = useState(true)
-  const [chatMinimized, setChatMinimized] = useState(false)
-  const [chatClosing, setChatClosing] = useState(false)
-  const [chatJustMinimized, setChatJustMinimized] = useState(false)
+  const [deletingIds, setDeletingIds] = useState([])
+  const [terminals, setTerminals] = useState([
+    { id: 'term_1', logs: [], loading: false, input: '' },
+  ])
+  const [activeTerminal, setActiveTerminal] = useState('term_1')
   const [toast, setToast] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
-  const [deletingIds, setDeletingIds] = useState([])
 
-  const handleMinimizeChat = () => {
-    setChatClosing(true)
+  const toggleChat = () => {
+    if (chatMinimized) {
+      setChatMinimized(false)
+    } else {
+      setChatClosing(true)
+      setTimeout(() => {
+        setChatMinimized(true)
+        setChatClosing(false)
+      }, 600)
+    }
+  }
+
+  const handleMinimizeTerminal = () => {
+    setTerminalClosing(true)
     setTimeout(() => {
-      setChatMinimized(true)
-      setChatClosing(false)
-      setChatJustMinimized(true)
-      setTimeout(() => setChatJustMinimized(false), 600)
+      setTerminalVisible(false)
+      setTerminalClosing(false)
     }, 600)
   }
-  const handleRestoreChat = () => {
-    setChatMinimized(false)
+
+  const appendToTerminal = (termId, lines) => {
+    setTerminals(prev => prev.map(t =>
+      t.id === termId
+        ? { ...t, logs: [...t.logs, ...(Array.isArray(lines) ? lines : [lines])] }
+        : t
+    ))
   }
-  
+
+  const addTerminal = () => {
+    const id = 'term_' + Date.now() + '_' + Math.random().toString(36).slice(2, 4)
+    setTerminals(prev => [...prev, { id, logs: [], loading: false, input: '' }])
+    setActiveTerminal(id)
+  }
+
+  const closeTerminal = (id) => {
+    setTerminals(prev => {
+      const filtered = prev.filter(t => t.id !== id)
+      if (filtered.length === 0) {
+        const newId = 'term_' + Date.now()
+        return [{ id: newId, logs: [], loading: false, input: '' }]
+      }
+      return filtered
+    })
+  }
+
+
+
+  const handleTerminalSubmit = async (e, termId) => {
+    e.preventDefault()
+    const term = terminals.find(t => t.id === termId)
+    if (!term || !term.input.trim() || term.loading) return
+
+    const cmd = term.input.trim()
+    setTerminals(prev => prev.map(t =>
+      t.id === termId ? { ...t, input: '' } : t
+    ))
+    
+    appendToTerminal(termId, [`nexura@scanner:~$ ${cmd}`])
+    
+    if (cmd.toLowerCase() === 'clear') {
+      setTerminals(prev => prev.map(t =>
+        t.id === termId ? { ...t, logs: [] } : t
+      ))
+      return
+    }
+
+    setTerminals(prev => prev.map(t =>
+      t.id === termId ? { ...t, loading: true } : t
+    ))
+    
+    try {
+      const res = await apiFetch('/api/terminal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cmd }),
+      })
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || `Server aloqa xatosi (${res.status})`)
+      }
+
+      const data = await res.json()
+      const lines = []
+      if (data.error) {
+        lines.push(`[ERROR]: ${data.error}`)
+      } else {
+        if (data.output) lines.push(data.output)
+        if (data.error_log) lines.push(`[STDERR]: ${data.error_log}`)
+        if (data.code !== 0 && !data.output) lines.push(`Exit code: ${data.code}`)
+      }
+      appendToTerminal(termId, lines)
+    } catch (err) {
+      appendToTerminal(termId, [`[FAIL]: ${err.message}`])
+    } finally {
+      setTerminals(prev => prev.map(t =>
+        t.id === termId ? { ...t, loading: false } : t
+      ))
+    }
+  }
+
   // Refs for auto-scroll
   const chatEndRef = useRef(null)
 
@@ -501,7 +690,7 @@ export default function Scanner() {
           NEXURA
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-          AI Kiberxavfsizlik yordamchisi va interaktiv terminal muhiti
+          AI kiberxavfsizlik yordamchisi va interaktiv terminal muhiti
         </p>
       </div>
 
@@ -644,7 +833,7 @@ export default function Scanner() {
                     flexShrink: 0,
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span onClick={handleMinimizeChat} style={{ width: 12, height: 12, borderRadius: '50%', background: '#ee411a', cursor: 'pointer', display: 'inline-block', transition: 'transform 0.15s' }}
+                      <span onClick={toggleChat} style={{ width: 12, height: 12, borderRadius: '50%', background: '#ee411a', cursor: 'pointer', display: 'inline-block', transition: 'transform 0.15s' }}
                         onMouseEnter={e => e.target.style.transform = 'scale(1.3)'}
                         onMouseLeave={e => e.target.style.transform = 'scale(1)'} />
                       <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#f5a623', display: 'inline-block' }} />
@@ -869,6 +1058,85 @@ export default function Scanner() {
                   </StyledWrapper>
                 </form>
               </div>{/* End Chat Main Area */}
+              </PanelWrapper>
+            </Panel>
+          )}
+
+          {/* RIGHT COLUMN: Terminal (multi-tab) */}
+          {terminalVisible && (
+            <Panel style={{ flex: 1 }}>
+              <PanelWrapper $closing={terminalClosing} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <TerminalBox>
+                <TerminalToolbar>
+                  <Buttons>
+                    <Dot $color="#ee411a" onClick={handleMinimizeTerminal} />
+                    <Dot />
+                    <Dot />
+                  </Buttons>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, overflow: 'hidden', margin: '0 8px' }}>
+                    <img src="/terminal.png" alt="terminal" style={{ width: 18, height: 18, objectFit: 'contain' }} />
+                    {terminals.map(t => (
+                      <div key={t.id} onClick={() => setActiveTerminal(t.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          padding: '3px 10px', cursor: 'pointer', borderRadius: '4px 4px 0 0',
+                          fontSize: 12, color: t.id === activeTerminal ? '#fff' : '#888',
+                          background: t.id === activeTerminal ? 'rgba(255,255,255,0.08)' : 'transparent',
+                          borderBottom: t.id === activeTerminal ? '1px solid #27c39f' : '1px solid transparent',
+                          transition: 'all 0.15s', whiteSpace: 'nowrap',
+                        }}>
+                        <span>#{terminals.indexOf(t) + 1}</span>
+                        {terminals.length > 1 && (
+                          <span onClick={(e) => { e.stopPropagation(); closeTerminal(t.id) }}
+                            style={{ fontSize: 10, opacity: 0.5, cursor: 'pointer', marginLeft: 2 }}>
+                            ✕
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <AddTab onClick={addTerminal}>+</AddTab>
+                </TerminalToolbar>
+                <TerminalBody>
+                  {terminals.map(t => {
+                    const inputId = 'term-input-' + t.id
+                    return (
+                    <div key={t.id} style={{ display: t.id === activeTerminal ? 'flex' : 'none', flex: 1, flexDirection: 'column', minHeight: 0 }}>
+                      <OutputArea>
+                        {t.logs.length === 0 && !t.loading && (
+                          <OutputLine $log="">Welcome to NEXURA Security Terminal #{terminals.indexOf(t) + 1}</OutputLine>
+                        )}
+                        {t.logs.map((log, idx) => (
+                          <OutputLine key={idx} $log={log}>{log}</OutputLine>
+                        ))}
+                        {t.loading && (
+                          <OutputLine $log="">Buyruq bajarilmoqda, kuting...</OutputLine>
+                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', padding: '4px 0', whiteSpace: 'nowrap' }}>
+                          <span style={{marginLeft:4,color:'#1eff8e'}}>00Kubi@admin:</span>
+                          <span style={{marginLeft:4,color:'#4878c0'}}>~</span>
+                          <span style={{marginLeft:4,color:'#ddd'}}>$</span>
+                          <form onSubmit={(e) => handleTerminalSubmit(e, t.id)} style={{ display: 'flex', flex: 1, minWidth: 0 }}>
+                            <TerminalInput2
+                              id={inputId}
+                              value={t.input}
+                              onChange={e => {
+                                setTerminals(prev => prev.map(term =>
+                                  term.id === t.id ? { ...term, input: e.target.value } : term
+                                ))
+                              }}
+                              placeholder="nmap -F target.com"
+                              disabled={t.loading}
+                              autoFocus
+                            />
+                          </form>
+                        </div>
+                      </OutputArea>
+                    </div>
+                    )
+                  })}
+                </TerminalBody>
+              </TerminalBox>
               </PanelWrapper>
             </Panel>
           )}

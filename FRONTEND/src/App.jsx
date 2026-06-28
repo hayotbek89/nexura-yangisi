@@ -86,8 +86,8 @@ export default function App() {
             {page === 'settings' && <Settings />}
           </div>
         </ErrorBoundary>
+        <TerminalToggle />
       </ScannerProvider>
-      <TerminalToggle />
     </ThemeProvider>
   )
 }

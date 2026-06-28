@@ -26,6 +26,11 @@ export const ScannerProvider = ({ children }) => {
   const [chatLogs, setChatLogs] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
 
+  const [chatMinimized, setChatMinimized] = useState(false);
+  const [chatClosing, setChatClosing] = useState(false);
+  const [terminalVisible, setTerminalVisible] = useState(false);
+  const [terminalClosing, setTerminalClosing] = useState(false);
+
   const value = {
     url, setUrl,
     scanning, setScanning,
@@ -39,6 +44,10 @@ export const ScannerProvider = ({ children }) => {
     agentic, setAgentic,
     chatLogs, setChatLogs,
     chatLoading, setChatLoading,
+    chatMinimized, setChatMinimized,
+    chatClosing, setChatClosing,
+    terminalVisible, setTerminalVisible,
+    terminalClosing, setTerminalClosing,
   };
 
   return (

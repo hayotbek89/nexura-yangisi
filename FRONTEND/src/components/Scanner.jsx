@@ -38,13 +38,6 @@ const PanelWrapper = styled.div`
   min-height: 0;
 `
 
-const dockBounce = keyframes`
-  0%, 100% { transform: translateY(0) scale(1); }
-  30% { transform: translateY(-18px) scale(1.1); }
-  50% { transform: translateY(0) scale(0.95); }
-  70% { transform: translateY(-8px) scale(1.05); }
-  85% { transform: translateY(0) scale(1); }
-`
 const PanelsContainer = styled.div`
   display: flex;
   flex-direction: row;
@@ -75,50 +68,6 @@ const Panel = styled.div`
     min-height: 300px;
   }
 `
-const Dock = styled.div`
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 12px;
-  padding: 8px 16px;
-  background: rgba(15, 21, 37, 0.85);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid #2761c3;
-  border-radius: 16px;
-  z-index: 100;
-  ${props => props.$empty && `display: none;`}
-`
-const DockItem = styled.button`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 12px;
-  background: rgba(39, 195, 159, 0.1);
-  border: 1px solid #27c39f;
-  border-radius: 10px;
-  color: #27c39f;
-  font-size: 11px;
-  cursor: pointer;
-  transform: scale(${props => props.$scale || 1}) translateY(${props => props.$scale > 1 ? -(props.$scale - 1) * 20 : 0}px);
-  transition: transform 0.15s cubic-bezier(0.25, 0.1, 0.25, 1);
-  transform-origin: bottom center;
-  animation: ${props => props.$justAdded ? dockBounce : 'none'} 0.6s cubic-bezier(0.25, 0.46, 0.45, 1.4);
-  &:hover {
-    background: rgba(39, 195, 159, 0.2);
-    box-shadow: 0 4px 12px rgba(39, 195, 159, 0.3);
-  }
-  &:active {
-    transform: scale(${props => (props.$scale || 1) * 0.95}) translateY(0);
-  }
-`
-const DockIcon = styled.div`
-  font-size: 20px;
-`
-
 const StyledWrapper = styled.div`
   .pb-ai-input-wrap {
     position: relative;
@@ -229,111 +178,6 @@ const StyledWrapper = styled.div`
   }
 `;
 
-const TerminalBox = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background: #1e1e1e;
-  font-family: Menlo, Consolas, monospace;
-  font-size: 14px;
-  color: #e6e6e6;
-  border-radius: 5px;
-  overflow: hidden;
-`
-
-const TerminalToolbar = styled.div`
-  display: flex;
-  height: 30px;
-  align-items: center;
-  padding: 0 8px;
-  background: #212121;
-  justify-content: space-between;
-  flex-shrink: 0;
-`
-
-const Buttons = styled.div`
-  display: flex;
-  align-items: center;
-`
-
-const Dot = styled.button`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 0;
-  margin-right: 5px;
-  font-size: 8px;
-  height: 12px;
-  width: 12px;
-  border: none;
-  border-radius: 100%;
-  background: ${p => p.$color || 'linear-gradient(#7d7871 0%, #595953 100%)'};
-  cursor: pointer;
-`
-
-const TabUser = styled.p`
-  color: #d5d0ce;
-  margin-left: 6px;
-  font-size: 14px;
-  line-height: 15px;
-`
-
-const AddTab = styled.div`
-  border: 1px solid #fff;
-  color: #fff;
-  padding: 0 6px;
-  border-radius: 4px 4px 0 0;
-  border-bottom: none;
-  cursor: pointer;
-`
-
-const TerminalBody = styled.div`
-  background: rgba(0, 0, 0, 0.6);
-  flex: 1;
-  padding-top: 2px;
-  font-size: 12px;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-`
-
-
-
-const OutputArea = styled.div`
-  padding: 4px;
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0;
-  scrollbar-width: thin;
-  scrollbar-color: #27c39f33 transparent;
-  &::-webkit-scrollbar { width: 4px; }
-  &::-webkit-scrollbar-thumb { background: #27c39f55; border-radius: 2px; }
-`
-
-const OutputLine = styled.pre`
-  margin: 0;
-  color: ${p =>
-    p.$log?.startsWith('nexura@scanner') ? '#38bdf8' :
-    p.$log?.startsWith('[ERROR]') || p.$log?.startsWith('[FAIL]') ? '#ef4444' :
-    p.$log?.startsWith('[STDERR]') ? '#f59e0b' : '#e6e6e6'};
-`
-
-const TerminalInput2 = styled.input`
-  width: 100%;
-  padding: 6px;
-  background: transparent;
-  border: none;
-  color: #e6e6e6;
-  caret-color: #e6e6e6;
-  outline: none;
-  font-family: Menlo, Consolas, monospace;
-  font-size: 12px;
-
-  &::placeholder { color: rgba(255,255,255,0.2); }
-`
-
 // Simple helper to format basic markdown (bold, lists, code blocks) safely into HTML
 function renderMarkdown(text) {
   if (!text) return ''
@@ -368,10 +212,7 @@ const MAX_CHATS = 20
 
 export default function Scanner() {
   const { scanning, setScanning, setFindings, setReportUrl, setScanId,
-    chatLogs, setChatLogs, chatLoading, setChatLoading,
-    terminals, setTerminals, activeTerminal, setActiveTerminal,
-    terminalScrolledUp, setTerminalScrolledUp,
-    appendToTerminal, addTerminal, closeTerminal } = useScanner()
+    chatLogs, setChatLogs, chatLoading, setChatLoading } = useScanner()
   
   // AI Chat States
   const [chatInput, setChatInput] = useState('')
@@ -383,23 +224,10 @@ export default function Scanner() {
   const [showSidebar, setShowSidebar] = useState(true)
   const [chatMinimized, setChatMinimized] = useState(false)
   const [chatClosing, setChatClosing] = useState(false)
-  const [terminalMinimized, setTerminalMinimized] = useState(false)
-  const [terminalClosing, setTerminalClosing] = useState(false)
   const [chatJustMinimized, setChatJustMinimized] = useState(false)
-  const [terminalJustMinimized, setTerminalJustMinimized] = useState(false)
-  const [mouseX, setMouseX] = useState(null)
-  const dockRef = useRef(null)
   const [toast, setToast] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [deletingIds, setDeletingIds] = useState([])
-
-  const handleDockMouseMove = (e) => {
-    const rect = dockRef.current.getBoundingClientRect()
-    setMouseX(e.clientX - rect.left)
-  }
-  const handleDockMouseLeave = () => {
-    setMouseX(null)
-  }
 
   const handleMinimizeChat = () => {
     setChatClosing(true)
@@ -413,93 +241,7 @@ export default function Scanner() {
   const handleRestoreChat = () => {
     setChatMinimized(false)
   }
-  const handleMinimizeTerminal = () => {
-    setTerminalClosing(true)
-    setTimeout(() => {
-      setTerminalMinimized(true)
-      setTerminalClosing(false)
-      setTerminalJustMinimized(true)
-      setTimeout(() => setTerminalJustMinimized(false), 600)
-    }, 600)
-  }
-  const handleRestoreTerminal = () => {
-    setTerminalMinimized(false)
-  }
-
-  const getItemScale = (itemIndex, totalItems, itemWidth = 90) => {
-    if (mouseX === null) return 1
-    const itemCenter = itemIndex * itemWidth + itemWidth / 2
-    const distance = Math.abs(mouseX - itemCenter)
-    const maxDistance = 150
-    if (distance > maxDistance) return 1
-    return 1 + (1 - distance / maxDistance) * 0.4
-  }
   
-  // QuickScan (Option B)
-  const [qsTarget, setQsTarget] = useState('')
-  const [qsTool, setQsTool] = useState('nmap')
-  const [availableTools, setAvailableTools] = useState([])
-  const [qsLoading, setQsLoading] = useState(false)
-  const [showQuickScan, setShowQuickScan] = useState(false)
-
-  // Chat tool selection (Option A)
-  const [pendingTarget, setPendingTarget] = useState(null)
-
-  useEffect(() => {
-    apiFetch('/api/tools').then(r => r.json()).then(d => {
-      setAvailableTools((d.tools || []).filter(t => t.available))
-    }).catch(() => {})
-  }, [])
-
-  // Build command from tool + target (mirrors backend TOOL_TEMPLATES + _clean_target)
-  const TOOL_TEMPLATES = {
-    nmap: 'nmap -sV -sC -O -T4 {host}',
-    nuclei: 'nuclei -u {target} -severity low,medium,high,critical',
-    nikto: 'nikto -h {target}',
-    sqlmap: 'sqlmap -u {target} --batch --random-agent',
-    gobuster: 'gobuster dir -u {target} -w /usr/share/wordlists/dirb/common.txt -t 50',
-    whatweb: 'whatweb {target}',
-    amass: 'amass enum -d {host}',
-  }
-  const cleanTarget = (target, tool) => {
-    let host = target.replace(/^https?:\/\//, '').replace(/[/?#].*$/, '')
-    if (['nmap', 'amass'].includes(tool)) return host
-    if (['nuclei', 'nikto', 'whatweb', 'gobuster'].includes(tool)) {
-      const scheme = target.startsWith('https://') ? 'https://' : target.startsWith('http://') ? 'http://' : 'https://'
-      return scheme + host
-    }
-    if (tool === 'sqlmap') return target
-    return host
-  }
-  const termSubmitRefs = useRef({})
-
-  const runScanWithTool = (target, tool) => {
-    const template = TOOL_TEMPLATES[tool]
-    if (!template) return
-    const host = cleanTarget(target, tool)
-    const cmd = template.replace('{target}', target).replace('{host}', host)
-    // Set the command into the active terminal's input
-    setTerminals(prev => prev.map(t =>
-      t.id === activeTerminal ? { ...t, input: cmd } : t
-    ))
-    setQsLoading(true)
-    setPendingTarget(null)
-    // Auto-submit the terminal form on next render
-    setTimeout(() => {
-      const form = termSubmitRefs.current[activeTerminal]
-      if (form) form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }))
-      setQsLoading(false)
-    }, 100)
-  }
-
-  // Detect domain/IP/URL pattern for Option A
-  const TARGET_RE = /([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|https?:\/\/[^\s]+/
-
-  // Terminal refs
-  const termRefs = useRef({})
-
-  const activeTerm = terminals.find(t => t.id === activeTerminal) || terminals[0]
-
   // Refs for auto-scroll
   const chatEndRef = useRef(null)
 
@@ -590,19 +332,6 @@ export default function Scanner() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatLogs, chatLoading])
 
-  // Smart auto-scroll: only scroll down if user is already near bottom
-  const handleTerminalScroll = (termId, e) => {
-    const el = e.currentTarget
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
-    setTerminalScrolledUp(prev => ({ ...prev, [termId]: !isNearBottom }))
-  }
-  useEffect(() => {
-    const term = terminals.find(t => t.id === activeTerminal)
-    if (!term || terminalScrolledUp[activeTerminal]) return
-    const ref = termRefs.current[activeTerminal]
-    if (ref) ref.scrollIntoView({ behavior: 'smooth' })
-  }, [activeTerminal, terminals])
-
   // Session management
   const switchSession = (sid) => {
     setChatSessionId(sid)
@@ -652,14 +381,6 @@ export default function Scanner() {
     }
 
       setChatLogs(prev => [...prev, { role: 'user', content: userMsg, timestamp: new Date() }])
-
-    // Option A: detect target in user message → show tool selection
-    const matchTarget = userMsg.match(TARGET_RE)
-    if (matchTarget) {
-      setPendingTarget(matchTarget[0].replace(/\/+$/, ''))
-    } else {
-      setPendingTarget(null)
-    }
 
     if (modelLoaded === false) {
       setChatLogs(prev => [...prev, {
@@ -713,13 +434,6 @@ export default function Scanner() {
         }
       }
 
-      // Auto-execute scan if AI detected tool + target
-      if (data.scan_action) {
-        const { tool, target: scanTarget } = data.scan_action
-        appendToActiveTerminal([`[NEXURA] AI ${tool.toUpperCase()} skanerlashni boshladi: ${scanTarget}`])
-        runScanWithTool(scanTarget, tool)
-      }
-
       setChatLogs(prev => [...prev, {
         role: 'ai',
         content: data.response,
@@ -736,127 +450,6 @@ export default function Scanner() {
       setChatLoading(false)
       setScanning(false)
     }
-  }
-
-  const SCAN_TOOLS = ['nmap', 'nuclei', 'nikto', 'sqlmap', 'gobuster', 'whatweb', 'amass']
-
-  // Poll a scan job until completion, then add analysis to chat
-  const pollScanJob = async (scanId, tool) => {
-    let attempts = 0
-    const maxAttempts = 120
-    const poll = async () => {
-      try {
-        const res = await apiFetch(`/api/analyze/status/${scanId}`)
-        if (!res.ok) return
-        const data = await res.json()
-        if (data.status === 'completed') {
-          setChatLogs(prev => [...prev, {
-            role: 'ai', content: data.analysis || `${tool.toUpperCase()} skanerlash yakunlandi`,
-            timestamp: new Date(),
-          }])
-          return
-        }
-        if (data.status === 'error') {
-          setChatLogs(prev => [...prev, {
-            role: 'ai', content: `❌ ${tool.toUpperCase()} skanerlash xatosi: ${data.error}`,
-            timestamp: new Date(),
-          }])
-          return
-        }
-      } catch (_) {}
-      attempts++
-      if (attempts < maxAttempts) setTimeout(poll, 2000)
-    }
-    setTimeout(poll, 1000)
-  }
-
-  // Submit command to secure web terminal
-  const handleTerminalSubmit = async (e, termId) => {
-    e.preventDefault()
-    const term = terminals.find(t => t.id === termId)
-    if (!term || !term.input.trim() || term.loading) return
-
-    const cmd = term.input.trim()
-    setTerminals(prev => prev.map(t =>
-      t.id === termId ? { ...t, input: '' } : t
-    ))
-    
-    appendToTerminal(termId, [`nexura@scanner:~$ ${cmd}`])
-    
-    if (cmd.toLowerCase() === 'clear') {
-      setTerminals(prev => prev.map(t =>
-        t.id === termId ? { ...t, logs: [] } : t
-      ))
-      return
-    }
-
-    setTerminals(prev => prev.map(t =>
-      t.id === termId ? { ...t, loading: true } : t
-    ))
-    
-    try {
-      const res = await apiFetch('/api/terminal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cmd }),
-      })
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}))
-        throw new Error(errData.error || `Server aloqa xatosi (${res.status})`)
-      }
-
-      const data = await res.json()
-      const lines = []
-      let fullOutput = ''
-      if (data.error) {
-        lines.push(`[ERROR]: ${data.error}`)
-        fullOutput = data.error
-      } else {
-        if (data.output) lines.push(data.output)
-        if (data.error_log) lines.push(`[STDERR]: ${data.error_log}`)
-        if (data.code !== 0 && !data.output) lines.push(`Exit code: ${data.code}`)
-        fullOutput = [data.output, data.error_log].filter(Boolean).join('\n')
-      }
-      appendToTerminal(termId, lines)
-
-      // Detect scan command → start async analysis + polling
-      const firstWord = cmd.split(/\s+/)[0]?.toLowerCase()
-      if (fullOutput && SCAN_TOOLS.includes(firstWord)) {
-        let sid = chatSessionId
-        if (!sid) {
-          sid = 'chat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
-          localStorage.setItem('nexura_chat_session', sid)
-          setChatSessionId(sid)
-        }
-        try {
-          const startRes = await apiFetch('/api/analyze/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              scan_output: fullOutput.slice(0, 30000),
-              tool: firstWord,
-              target: cmd.split(/\s+/).slice(-1)[0],
-              session_id: sid,
-            }),
-          })
-          if (startRes.ok) {
-            const { scan_id } = await startRes.json()
-            if (scan_id) pollScanJob(scan_id, firstWord)
-          }
-        } catch (_) {}
-      }
-    } catch (err) {
-      appendToTerminal(termId, [`[FAIL]: ${err.message}`])
-    } finally {
-      setTerminals(prev => prev.map(t =>
-        t.id === termId ? { ...t, loading: false } : t
-      ))
-    }
-  }
-
-  const appendToActiveTerminal = (lines) => {
-    appendToTerminal(activeTerminal, lines)
   }
 
   // Confirm delete handler
@@ -912,47 +505,7 @@ export default function Scanner() {
         </p>
       </div>
 
-      {/* Option B: QuickScan Panel */}
-      <div style={{
-        background: 'var(--bg-card)', borderRadius: 'var(--radius)', border: '1px solid var(--border)',
-        overflow: 'hidden', marginBottom: showQuickScan ? 0 : 0,
-      }}>
-        <div onClick={() => setShowQuickScan(!showQuickScan)} style={{
-          padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
-          background: 'var(--bg-input)', userSelect: 'none',
-        }}>
-          <span style={{ fontSize: 16 }}>{showQuickScan ? '▾' : '▸'}</span>
-          <span style={{ fontWeight: 600, fontSize: 13 }}>⚡ Tezkor skanerlash</span>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>— domen/IP kiriting va vositani tanlang</span>
-        </div>
-        {showQuickScan && (
-          <div style={{ padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <input type="text" value={qsTarget} onChange={e => setQsTarget(e.target.value)}
-              placeholder="example.com yoki 192.168.1.1"
-              style={{
-                flex: 1, minWidth: 200, padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)',
-                borderRadius: 6, color: 'var(--text)', fontSize: 13, outline: 'none',
-              }} />
-            <select value={qsTool} onChange={e => setQsTool(e.target.value)}
-              style={{
-                padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)',
-                borderRadius: 6, color: 'var(--text)', fontSize: 13, cursor: 'pointer', outline: 'none',
-              }}>
-              {availableTools.map(t => (
-                <option key={t.name} value={t.name}>{t.label} — {t.description}</option>
-              ))}
-            </select>
-            <button onClick={() => runScanWithTool(qsTarget.trim(), qsTool)} disabled={qsLoading || !qsTarget.trim()}
-              style={{
-                padding: '8px 20px', background: qsLoading ? 'var(--text-muted)' : 'var(--primary)',
-                color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600,
-                cursor: qsLoading ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
-              }}>
-              {qsLoading ? 'Skanerlanmoqda...' : 'Ishga tushirish'}
-            </button>
-          </div>
-        )}
-      </div>
+
 
       {/* Main Split Grid */}
       <div style={{
@@ -964,7 +517,7 @@ export default function Scanner() {
         <PanelsContainer>
           {/* LEFT COLUMN: AI Chat Assistant */}
           {!chatMinimized && (
-            <Panel style={{ flex: terminalMinimized ? 2 : 1 }}>
+            <Panel style={{ flex: 1 }}>
               <PanelWrapper $closing={chatClosing} style={{
                 flex: 1,
                 display: 'flex',
@@ -1315,157 +868,13 @@ export default function Scanner() {
                     </div>
                   </StyledWrapper>
                 </form>
-                {/* Option A: Tool selection buttons */}
-                {pendingTarget && availableTools.length > 0 && (
-                  <div style={{
-                    padding: '8px 12px', borderTop: '1px solid var(--border)',
-                    background: 'rgba(39,195,159,0.05)',
-                  }}>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
-                      {pendingTarget} — qaysi vosita bilan skanerlaymiz?
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {availableTools.map(t => (
-                        <button key={t.name} onClick={() => { runScanWithTool(pendingTarget, t.name); setShowQuickScan(false); setPendingTarget(null) }}
-                          style={{
-                            padding: '6px 12px', background: 'rgba(24,95,165,0.15)', border: '1px solid var(--primary)',
-                            borderRadius: 6, color: 'var(--primary)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(24,95,165,0.3)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'rgba(24,95,165,0.15)'}>
-                          {t.label}
-                        </button>
-                      ))}
-                      <button onClick={() => setPendingTarget(null)}
-                        style={{
-                          padding: '6px 12px', background: 'transparent', border: '1px solid var(--border)',
-                          borderRadius: 6, color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer',
-                        }}>
-                        Bekor qilish
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>{/* End Chat Main Area */}
               </PanelWrapper>
             </Panel>
           )}
 
-          {/* RIGHT COLUMN: Terminal (multi-tab) */}
-          {!terminalMinimized && (
-            <Panel style={{ flex: chatMinimized ? 2 : 1 }}>
-              <PanelWrapper $closing={terminalClosing} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <TerminalBox>
-                <TerminalToolbar>
-                  <Buttons>
-                    <Dot $color="#ee411a" onClick={handleMinimizeTerminal} />
-                    <Dot />
-                    <Dot />
-                  </Buttons>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, overflow: 'hidden', margin: '0 8px' }}>
-                    <img src="/terminal.png" alt="terminal" style={{ width: 18, height: 18, objectFit: 'contain' }} />
-                    {terminals.map(t => (
-                      <div key={t.id} onClick={() => setActiveTerminal(t.id)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 4,
-                          padding: '3px 10px', cursor: 'pointer', borderRadius: '4px 4px 0 0',
-                          fontSize: 12, color: t.id === activeTerminal ? '#fff' : '#888',
-                          background: t.id === activeTerminal ? 'rgba(255,255,255,0.08)' : 'transparent',
-                          borderBottom: t.id === activeTerminal ? '1px solid #27c39f' : '1px solid transparent',
-                          transition: 'all 0.15s', whiteSpace: 'nowrap',
-                        }}>
-                        <span>#{terminals.indexOf(t) + 1}</span>
-                        {terminals.length > 1 && (
-                          <span onClick={(e) => { e.stopPropagation(); closeTerminal(t.id) }}
-                            style={{ fontSize: 10, opacity: 0.5, cursor: 'pointer', marginLeft: 2 }}>
-                            ✕
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <AddTab onClick={addTerminal}>+</AddTab>
-                </TerminalToolbar>
-                <TerminalBody>
-                  {terminals.map(t => {
-                    const inputId = 'term-input-' + t.id
-                    return (
-                    <div key={t.id} style={{ display: t.id === activeTerminal ? 'flex' : 'none', flex: 1, flexDirection: 'column', minHeight: 0 }}>
-                      <OutputArea onScroll={(e) => handleTerminalScroll(t.id, e)} onClick={() => {
-                        const inp = document.getElementById(inputId)
-                        if (inp) inp.focus()
-                      }}>
-                        {t.logs.length === 0 && !t.loading && (
-                          <OutputLine $log="">Welcome to NEXURA Security Terminal #{terminals.indexOf(t) + 1}</OutputLine>
-                        )}
-                        {t.logs.map((log, idx) => (
-                          <OutputLine key={idx} $log={log}>{log}</OutputLine>
-                        ))}
-                        {t.loading && (
-                          <OutputLine $log="">Buyruq bajarilmoqda, kuting...</OutputLine>
-                        )}
-                        <div style={{ display: 'flex', alignItems: 'center', padding: '4px 0', whiteSpace: 'nowrap' }}>
-                          <span style={{marginLeft:4,color:'#1eff8e'}}>00Kubi@admin:</span>
-                          <span style={{marginLeft:4,color:'#4878c0'}}>~</span>
-                          <span style={{marginLeft:4,color:'#ddd'}}>$</span>
-                          <form ref={el => termSubmitRefs.current[t.id] = el} onSubmit={(e) => handleTerminalSubmit(e, t.id)} style={{ display: 'flex', flex: 1, minWidth: 0 }}>
-                            <TerminalInput2
-                              id={inputId}
-                              value={t.input}
-                              onChange={e => {
-                                setTerminals(prev => prev.map(term =>
-                                  term.id === t.id ? { ...term, input: e.target.value } : term
-                                ))
-                              }}
-                              placeholder="nmap -F target.com"
-                              disabled={t.loading}
-                              autoFocus
-                            />
-                          </form>
-                        </div>
-                        <div ref={el => termRefs.current[t.id] = el} />
-                      </OutputArea>
-                    </div>
-                    )
-                  })}
-                </TerminalBody>
-              </TerminalBox>
-              </PanelWrapper>
-            </Panel>
-          )}
-
-
         </PanelsContainer>
       </div>
-
-      {/* macOS-style Dock */}
-      <Dock
-        ref={dockRef}
-        onMouseMove={handleDockMouseMove}
-        onMouseLeave={handleDockMouseLeave}
-        $empty={!chatMinimized && !terminalMinimized}
-      >
-        {chatMinimized && (
-          <DockItem
-            $scale={getItemScale(0, (chatMinimized && terminalMinimized) ? 2 : 1)}
-            $justAdded={chatJustMinimized}
-            onClick={handleRestoreChat}
-          >
-            <DockIcon>💬</DockIcon>
-            <span>AI Chat</span>
-          </DockItem>
-        )}
-        {terminalMinimized && (
-          <DockItem
-            $scale={getItemScale((chatMinimized && terminalMinimized) ? 1 : 0, (chatMinimized && terminalMinimized) ? 2 : 1)}
-            $justAdded={terminalJustMinimized}
-            onClick={handleRestoreTerminal}
-          >
-            <DockIcon><img src="/terminal.png" alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} /></DockIcon>
-            <span>Terminal</span>
-          </DockItem>
-        )}
-      </Dock>
 
       {/* Confirm Delete Modal */}
       {confirmDelete && (

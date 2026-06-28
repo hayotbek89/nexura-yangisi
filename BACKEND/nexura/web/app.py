@@ -136,6 +136,7 @@ app.mount("/reports", StaticFiles(directory=str(config.REPORTS_DIR)), name="repo
 
 if FRONTEND_DIST.exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
 
 _cors_env = os.getenv("NEXURA_CORS_ORIGINS", "").strip()
 if _cors_env == "*":

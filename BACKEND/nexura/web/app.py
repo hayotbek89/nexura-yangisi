@@ -24,7 +24,7 @@ import httpx
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
@@ -136,7 +136,6 @@ app.mount("/reports", StaticFiles(directory=str(config.REPORTS_DIR)), name="repo
 
 if FRONTEND_DIST.exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
-    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
 
 _cors_env = os.getenv("NEXURA_CORS_ORIGINS", "").strip()
 if _cors_env == "*":
@@ -1393,3 +1392,14 @@ async def run_terminal(req: TerminalRequest, request: Request, _=Depends(_verify
 
     except Exception as e:
         return {"output": "", "error": f"Xatolik yuz berdi: {e}", "code": -1}
+
+
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    file_path = FRONTEND_DIST / full_path
+    if file_path.is_file():
+        return FileResponse(str(file_path))
+    index_file = FRONTEND_DIST / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    return HTMLResponse("Not Found", status_code=404)

@@ -100,9 +100,8 @@ export default function TermsOfServiceModal({ onAccept }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_identifier: 'default', tos_version: '1.0' }),
       })
-      if (res.ok) onAccept()
+      onAccept()
     } catch {
-      // fallback — allow anyway
       onAccept()
     }
     setLoading(false)

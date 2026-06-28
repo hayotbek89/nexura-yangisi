@@ -1011,7 +1011,7 @@ async def verify_check(req: VerifyCheckRequest, request: Request, _=Depends(_ver
 # ---- ToS Endpoints ----
 
 @app.post("/api/tos/accept")
-async def tos_accept(req: TosAcceptRequest, request: Request, _=Depends(_verify_token)):
+async def tos_accept(req: TosAcceptRequest, request: Request):
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(
         None,

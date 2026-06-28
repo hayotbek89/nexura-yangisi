@@ -178,12 +178,13 @@ const StyledWrapper = styled.div`
     justify-content: center;
   }
   @keyframes starPop {
-    0% { opacity: 0; }
-    40% { opacity: 1; }
-    100% { opacity: 0.85; }
+    0% { opacity: 0; transform: scale(0.3); }
+    50% { opacity: 1; transform: scale(1.2); }
+    100% { opacity: 0.85; transform: scale(1); }
   }
   .star-anim {
     animation: starPop 0.5s ease-out forwards;
+    transform-origin: 0 0;
   }
 `;
 
@@ -1067,14 +1068,20 @@ export default function Scanner() {
                               <path id="s4" d="M0-2.2 L0.66-0.66 L2.2 0 L0.66 0.66 L0 2.2 L-0.66 0.66 L-2.2 0 L-0.66-0.66 Z" fill="currentColor" />
                             </defs>
                             <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="0.8" opacity="0.3" />
-                            <g className="star-anim" style={{ animationDelay: '0s' }}>
-                              <use href="#s4" transform="translate(12, 3.5)" />
+                            <g transform="translate(12, 3.5)">
+                              <g className="star-anim" style={{ animationDelay: '0s' }}>
+                                <use href="#s4" />
+                              </g>
                             </g>
-                            <g className="star-anim" style={{ animationDelay: '0.25s' }}>
-                              <use href="#s4" transform="translate(7, 16) scale(0.8)" />
+                            <g transform="translate(7, 16) scale(0.8)">
+                              <g className="star-anim" style={{ animationDelay: '0.25s' }}>
+                                <use href="#s4" />
+                              </g>
                             </g>
-                            <g className="star-anim" style={{ animationDelay: '0.5s' }}>
-                              <use href="#s4" transform="translate(17, 16) scale(0.8)" />
+                            <g transform="translate(17, 16) scale(0.8)">
+                              <g className="star-anim" style={{ animationDelay: '0.5s' }}>
+                                <use href="#s4" />
+                              </g>
                             </g>
                           </svg>
                         </span>

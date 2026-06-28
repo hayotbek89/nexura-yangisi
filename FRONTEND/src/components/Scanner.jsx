@@ -173,16 +173,9 @@ const StyledWrapper = styled.div`
     transform: scale(0.97);
   }
   .pb-ai-sparkle {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
-  }
-  @keyframes starPop {
-    0% { opacity: 0; }
-    100% { opacity: 0.85; }
-  }
-  .star-anim {
-    animation: starPop 0.5s ease-out forwards;
   }
 `;
 
@@ -1060,17 +1053,7 @@ export default function Scanner() {
                       />
                       <button className="pb-ai-input-btn" type="submit" disabled={chatLoading || !chatInput.trim()}>
                         <span>Yuborish</span>
-                        <span className="pb-ai-sparkle">
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ display: 'block' }}>
-                            <defs>
-                              <path id="s4" d="M0-2.2 L0.66-0.66 L2.2 0 L0.66 0.66 L0 2.2 L-0.66 0.66 L-2.2 0 L-0.66-0.66 Z" fill="currentColor" />
-                            </defs>
-                            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="0.8" opacity="0.3" />
-                            <use href="#s4" transform="translate(12, 3.5)" opacity="0" className="star-anim" style={{ animationDelay: '0s' }} />
-                            <use href="#s4" transform="translate(7, 16) scale(0.8)" opacity="0" className="star-anim" style={{ animationDelay: '0.25s' }} />
-                            <use href="#s4" transform="translate(17, 16) scale(0.8)" opacity="0" className="star-anim" style={{ animationDelay: '0.5s' }} />
-                          </svg>
-                        </span>
+                        <img src="/ai.png" alt="" style={{ width: 18, height: 18, display: 'block' }} />
                       </button>
                     </div>
                   </StyledWrapper>

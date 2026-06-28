@@ -434,6 +434,7 @@ export default function Scanner() {
 
   // Refs for auto-scroll
   const chatEndRef = useRef(null)
+  const terminalEndRef = useRef(null)
 
   // Polling for AI status every 30s
   useEffect(() => {
@@ -521,6 +522,10 @@ export default function Scanner() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatLogs, chatLoading])
+
+  useEffect(() => {
+    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [terminals])
 
   // Session management
   const switchSession = (sid) => {
@@ -1113,6 +1118,7 @@ export default function Scanner() {
                         {t.loading && (
                           <OutputLine $log="">Buyruq bajarilmoqda, kuting...</OutputLine>
                         )}
+                        <div ref={terminalEndRef} />
                         <div style={{ display: 'flex', alignItems: 'center', padding: '4px 0', whiteSpace: 'nowrap' }}>
                           <span style={{marginLeft:4,color:'#1eff8e'}}>00Kubi@admin:</span>
                           <span style={{marginLeft:4,color:'#4878c0'}}>~</span>

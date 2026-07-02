@@ -83,7 +83,7 @@ const pages = [
   { id: 'scanner', label: 'Scanner', icon: '' },
   { id: 'history', label: 'Tarix', icon: '' },
   { id: 'reports', label: 'Hisobotlar', icon: '' },
-  { id: 'github', label: 'GitHub', icon: '🐙' },
+  { id: 'github', label: 'GitHub', icon: '' },
   { id: 'settings', label: 'Sozlamalar', icon: '' },
 ]
 

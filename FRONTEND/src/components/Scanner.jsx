@@ -6,32 +6,40 @@ import styled, { keyframes } from 'styled-components'
 
 const genieClose = keyframes`
   0% {
-    clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
-    transform: scale(1) translate3d(0, 0, 0);
+    transform: scale(1) translateY(0);
     opacity: 1;
+    filter: blur(0px);
   }
   100% {
-    clip-path: polygon(45% 0%, 55% 0%, 50% 100%, 50% 100%);
-    transform: scale(0.05) translate3d(0, 250px, 0);
+    transform: scale(0.1) translateY(200px);
     opacity: 0;
+    filter: blur(20px);
   }
 `
 const genieOpen = keyframes`
   0% {
-    clip-path: polygon(45% 0%, 55% 0%, 50% 100%, 50% 100%);
-    transform: scale(0.05) translate3d(0, 250px, 0);
+    transform: scale(0.1) translateY(200px);
     opacity: 0;
+    filter: blur(20px);
+  }
+  60% {
+    transform: scale(1.03) translateY(-10px);
+    opacity: 1;
+    filter: blur(2px);
+  }
+  80% {
+    transform: scale(0.98) translateY(2px);
   }
   100% {
-    clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
-    transform: scale(1) translate3d(0, 0, 0);
+    transform: scale(1) translateY(0);
     opacity: 1;
+    filter: blur(0px);
   }
 `
 const PanelWrapper = styled.div`
   transform-origin: bottom center;
-  animation: ${props => props.$closing ? genieClose : genieOpen} 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: transform, opacity;
+  animation: ${props => props.$closing ? genieClose : genieOpen} 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  will-change: transform, opacity, filter;
   backface-visibility: hidden;
   perspective: 1000px;
   overflow: hidden;
@@ -41,18 +49,19 @@ const PanelWrapper = styled.div`
 const PanelsContainer = styled.div`
   display: flex;
   flex-direction: row;
-  gap: 16px;
+  gap: 20px;
   width: 100%;
+  max-width: 1600px;
   flex: 1;
   min-height: 0;
   height: 100%;
   align-items: stretch;
   overflow: hidden;
-  @media (max-width: 1024px) {
+  margin: 0 auto;
+  @media (max-width: 1200px) {
     flex-direction: column;
-    height: auto;
-    min-height: auto;
-    flex: none;
+    height: 100%;
+    overflow-y: auto;
   }
 `
 const Panel = styled.div`
@@ -62,10 +71,9 @@ const Panel = styled.div`
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  @media (max-width: 1024px) {
-    height: 50vh;
+  @media (max-width: 1200px) {
+    min-height: 500px;
     flex: none;
-    min-height: 300px;
   }
 `
 const StyledWrapper = styled.div`
@@ -183,98 +191,127 @@ const TerminalBox = styled.div`
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #1e1e1e;
-  font-family: Menlo, Consolas, monospace;
-  font-size: 14px;
-  color: #e6e6e6;
-  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  font-family: 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
+  font-size: 13px;
+  color: #f8fafc;
+  border-radius: 18px;
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 `
 
 const TerminalToolbar = styled.div`
   display: flex;
-  height: 30px;
+  height: 44px;
   align-items: center;
-  padding: 0 8px;
-  background: #212121;
+  padding: 0 16px;
+  background: rgba(30, 41, 59, 0.4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   justify-content: space-between;
   flex-shrink: 0;
+  user-select: none;
 `
 
 const Buttons = styled.div`
   display: flex;
   align-items: center;
+  gap: 8px;
 `
 
 const Dot = styled.button`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 0;
-  margin-right: 5px;
-  font-size: 8px;
-  height: 12px;
   width: 12px;
+  height: 12px;
+  border-radius: 50%;
   border: none;
-  border-radius: 100%;
-  background: ${p => p.$color || 'linear-gradient(#7d7871 0%, #595953 100%)'};
+  background: ${p => p.$color || 'rgba(255, 255, 255, 0.2)'};
   cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s;
+  position: relative;
+
+  &:hover {
+    opacity: 0.8;
+  }
+
+  &::after {
+    content: "${p => p.$icon || ''}";
+    font-size: 7px;
+    color: rgba(0,0,0,0.5);
+    font-weight: bold;
+    display: none;
+  }
+
+  &:hover::after {
+    display: block;
+  }
 `
 
 const AddTab = styled.div`
-  border: 1px solid #fff;
-  color: #fff;
-  padding: 0 6px;
-  border-radius: 4px 4px 0 0;
-  border-bottom: none;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
   cursor: pointer;
+  transition: all 0.2s;
+  font-size: 18px;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
 `
 
 const TerminalBody = styled.div`
-  background: rgba(0, 0, 0, 0.6);
   flex: 1;
-  padding-top: 2px;
-  font-size: 12px;
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  background: rgba(0, 0, 0, 0.2);
 `
 
 const OutputArea = styled.div`
-  padding: 4px;
+  padding: 20px;
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
-  scrollbar-width: thin;
-  scrollbar-color: #27c39f33 transparent;
-  &::-webkit-scrollbar { width: 4px; }
-  &::-webkit-scrollbar-thumb { background: #27c39f55; border-radius: 2px; }
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
 `
 
-const OutputLine = styled.pre`
-  margin: 0;
+const OutputLine = styled.div`
+  margin-bottom: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
   color: ${p =>
-    p.$log?.startsWith('nexura@scanner') ? '#38bdf8' :
-    p.$log?.startsWith('[ERROR]') || p.$log?.startsWith('[FAIL]') ? '#ef4444' :
-    p.$log?.startsWith('[STDERR]') ? '#f59e0b' : '#e6e6e6'};
+    p.$log?.includes('nexura@scanner:~$') ? '#38bdf8' :
+    p.$log?.startsWith('[ERROR]') || p.$log?.startsWith('[FAIL]') ? '#f87171' :
+    p.$log?.startsWith('[STDERR]') ? '#fbbf24' : '#e2e8f0'};
 `
-
-
 
 const TerminalInput2 = styled.input`
   width: 100%;
-  padding: 6px;
+  padding: 0 8px;
   background: transparent;
   border: none;
-  color: #e6e6e6;
-  caret-color: #e6e6e6;
+  color: #fff;
+  caret-color: #38bdf8;
   outline: none;
-  font-family: Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-family: inherit;
+  font-size: inherit;
 
-  &::placeholder { color: rgba(255,255,255,0.2); }
+  &::placeholder { color: rgba(255,255,255,0.15); }
 `
 
 // Simple helper to format basic markdown (bold, lists, code blocks) safely into HTML
@@ -401,6 +438,17 @@ export default function Scanner() {
       t.id === termId ? { ...t, loading: true } : t
     ))
     
+    // Avtomatik yopish mantiqi
+    setChatClosing(true)
+    setTerminalClosing(true)
+    setTimeout(() => {
+      setChatMinimized(true)
+      setTerminalVisible(false)
+      setChatClosing(false)
+      setTerminalClosing(false)
+      setScanning(true)
+    }, 600)
+
     try {
       const res = await apiFetch('/api/terminal', {
         method: 'POST',
@@ -592,7 +640,16 @@ export default function Scanner() {
 
     if (!isSimple) {
       setChatLoading(true)
-      setScanning(true)
+      // Avtomatik yopish mantiqi
+      setChatClosing(true)
+      setTerminalClosing(true)
+      setTimeout(() => {
+        setChatMinimized(true)
+        setTerminalVisible(false)
+        setChatClosing(false)
+        setTerminalClosing(false)
+        setScanning(true)
+      }, 600)
     }
 
     try {
@@ -689,13 +746,13 @@ export default function Scanner() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16, paddingBottom: 80, overflow: 'hidden', minHeight: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16, paddingBottom: 90, overflow: 'hidden', minHeight: 0 }}>
       {/* Title Header */}
-      <div style={{ textAlign: 'center', marginBottom: 4 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 2 }}>
+      <div style={{ textAlign: 'center', marginBottom: 0 }}>
+        <h1 style={{ fontSize: 32, fontWeight: 900, marginBottom: 2, letterSpacing: 2 }}>
           NEXURA
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 14, opacity: 0.8 }}>
           AI kiberxavfsizlik yordamchisi va interaktiv terminal muhiti
         </p>
       </div>
@@ -708,71 +765,77 @@ export default function Scanner() {
         flex: 1,
         minHeight: 0,
         overflow: 'hidden',
+        justifyContent: 'center',
+        alignItems: 'center'
       }}>
-        <PanelsContainer>
+        {scanning && <Loader />}
+
+        <PanelsContainer style={{ display: scanning ? 'none' : 'flex' }}>
           {/* LEFT COLUMN: AI Chat Assistant */}
           {!chatMinimized && (
-            <Panel style={{ flex: 1 }}>
+            <Panel style={{ flex: 1.2 }}>
               <PanelWrapper $closing={chatClosing} style={{
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'row',
-                background: 'var(--bg-card)',
-                borderRadius: 'var(--radius)',
-                border: '1px solid var(--border)',
+                background: 'rgba(30, 41, 59, 0.5)',
+                backdropFilter: 'blur(30px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+                borderRadius: '18px',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
                 overflow: 'hidden',
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.1)',
               }}>
                 {/* CHAT HISTORY SIDEBAR */}
                 <div style={{
-                  width: showSidebar ? 220 : 0,
-                  minWidth: showSidebar ? 220 : 0,
+                  width: showSidebar ? 240 : 0,
+                  minWidth: showSidebar ? 240 : 0,
                   overflow: 'hidden',
-                  background: 'var(--bg-input)',
-                  borderRight: showSidebar ? '1px solid var(--border)' : 'none',
+                  background: 'rgba(15, 23, 42, 0.3)',
+                  borderRight: showSidebar ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
                   display: 'flex',
                   flexDirection: 'column',
-                  transition: 'width 0.2s, min-width 0.2s',
+                  transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}>
                   <div style={{
-                    padding: 12,
-                    borderBottom: '1px solid var(--border)',
+                    padding: '20px 16px',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    gap: 6,
                   }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 1.5 }}>
                       Chatlar
                     </span>
-                    <div style={{ display: 'flex', gap: 4 }}>
+                    <div style={{ display: 'flex', gap: 6 }}>
                       {chatSessions.length > 0 && (
                         <button onClick={() => setConfirmDelete({ label: null, session_id: '__all__' })} style={{
-                          background: 'rgba(239,68,68,0.15)', color: '#ef4444',
-                          border: 'none', borderRadius: 4, padding: '4px 8px',
-                          fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
-                        }}>
+                          background: 'rgba(239,68,68,0.15)', color: '#ff453a',
+                          border: 'none', borderRadius: 6, padding: '5px 8px',
+                          fontSize: 12, cursor: 'pointer', transition: 'all 0.2s'
+                        }} title="Barchasini tozalash">
                           🗑️
                         </button>
                       )}
                       <button onClick={createNewSession} style={{
-                        background: 'var(--primary)',
+                        background: 'rgba(255,255,255,0.1)',
                         color: '#fff',
                         border: 'none',
-                        borderRadius: 4,
-                        padding: '4px 8px',
-                        fontSize: 11,
+                        borderRadius: 6,
+                        padding: '5px 10px',
+                        fontSize: 12,
                         fontWeight: 600,
                         cursor: 'pointer',
+                        transition: 'all 0.2s'
                       }}>
                         + Yangi
                       </button>
                     </div>
                   </div>
-                  <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
                     {chatSessions.length === 0 && (
-                      <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
-                        Hozircha chatlar yo'q
+                      <div style={{ padding: 20, fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
+                        Tarix bo'sh
                       </div>
                     )}
                     {chatSessions.map((s, i) => {
@@ -784,28 +847,36 @@ export default function Scanner() {
                       return (
                         <div key={s.session_id} style={{
                           display: 'flex', alignItems: 'center',
-                          background: isActive ? 'rgba(24,95,165,0.15)' : 'transparent',
-                          borderLeft: isActive ? '3px solid var(--primary)' : '3px solid transparent',
-                          transition: 'all 0.3s ease',
+                          background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                          borderRadius: '10px',
+                          margin: '2px 0',
+                          transition: 'all 0.2s ease',
                           position: 'relative',
                           opacity: isDeleting ? 0 : 1,
-                          transform: isDeleting ? 'translateX(-100%)' : 'translateX(0)',
-                          maxHeight: isDeleting ? 0 : 60,
+                          transform: isDeleting ? 'translateX(-20px)' : 'translateX(0)',
+                          maxHeight: isDeleting ? 0 : 65,
                           overflow: 'hidden',
-                          marginBottom: isDeleting ? 0 : 0,
                         }}
-                          onMouseEnter={e => { const btn = e.currentTarget.querySelector('.chat-del-btn'); if (btn) btn.style.opacity = '1' }}
-                          onMouseLeave={e => { const btn = e.currentTarget.querySelector('.chat-del-btn'); if (btn) btn.style.opacity = '0' }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = isActive ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)';
+                            const btn = e.currentTarget.querySelector('.chat-del-btn');
+                            if (btn) btn.style.opacity = '1'
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = isActive ? 'rgba(255,255,255,0.1)' : 'transparent';
+                            const btn = e.currentTarget.querySelector('.chat-del-btn');
+                            if (btn) btn.style.opacity = '0'
+                          }}
                         >
                           <div onClick={() => switchSession(s.session_id)} style={{
-                            flex: 1, padding: '10px 8px', cursor: 'pointer',
-                            fontSize: 12, color: isActive ? 'var(--primary)' : 'var(--text)',
+                            flex: 1, padding: '12px 12px', cursor: 'pointer',
+                            fontSize: 13, color: isActive ? '#fff' : 'rgba(255,255,255,0.7)',
                             fontWeight: isActive ? 600 : 400, minWidth: 0,
                           }}>
                             <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {label}
                             </div>
-                            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>
                               {s.msg_count} xabar
                             </div>
                           </div>
@@ -813,12 +884,11 @@ export default function Scanner() {
                             label,
                             session_id: s.session_id,
                           })} style={{
-                            background: 'rgba(239,68,68,0.15)', border: 'none', color: '#ef4444',
-                            cursor: 'pointer', padding: '4px 6px', fontSize: 13, borderRadius: 4,
-                            opacity: 0, flexShrink: 0, marginRight: 4, transition: 'opacity 0.15s',
-                            fontWeight: 600, lineHeight: 1,
+                            background: 'transparent', border: 'none', color: '#ff453a',
+                            cursor: 'pointer', padding: '8px', fontSize: 14, borderRadius: 8,
+                            opacity: 0, flexShrink: 0, marginRight: 6, transition: 'all 0.2s',
                           }}>
-                            🗑️
+                            ✕
                           </button>
                         </div>
                       )
@@ -827,243 +897,253 @@ export default function Scanner() {
                 </div>
 
                 {/* Chat Main Area */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'rgba(15, 23, 42, 0.1)' }}>
                   {/* Chat Header */}
                   <div style={{
-                    background: 'var(--bg-input)',
-                    padding: '12px 16px',
-                    borderBottom: '1px solid var(--border)',
+                    padding: '16px 20px',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 10,
+                    gap: 15,
                     flexShrink: 0,
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span onClick={toggleChat} style={{ width: 12, height: 12, borderRadius: '50%', background: '#ee411a', cursor: 'pointer', display: 'inline-block', transition: 'transform 0.15s' }}
-                        onMouseEnter={e => e.target.style.transform = 'scale(1.3)'}
-                        onMouseLeave={e => e.target.style.transform = 'scale(1)'} />
-                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#f5a623', display: 'inline-block' }} />
-                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#27c39f', display: 'inline-block' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span onClick={toggleChat} style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff5f56', cursor: 'pointer', boxShadow: '0 0 2px rgba(0,0,0,0.2)', position: 'relative' }} />
+                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#ffbd2e', boxShadow: '0 0 2px rgba(0,0,0,0.2)' }} />
+                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#27c93f', boxShadow: '0 0 2px rgba(0,0,0,0.2)' }} />
                     </div>
                     <button onClick={() => setShowSidebar(s => !s)} style={{
-                      background: 'none',
-                      border: '1px solid var(--border)',
-                      borderRadius: 4,
-                      padding: '4px 6px',
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 8,
+                      padding: '6px',
                       cursor: 'pointer',
-                      color: 'var(--text-muted)',
-                      fontSize: 14,
+                      color: 'rgba(255,255,255,0.6)',
                       display: 'flex',
                       alignItems: 'center',
+                      transition: 'all 0.2s'
                     }}>
-                      ☰
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
                     </button>
-      <div>
-        <div style={{ fontWeight: 700, fontSize: 14 }}>NEXURA AI Assistant</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-          <span style={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            background: modelLoaded ? '#22c55e' : '#f59e0b',
-            display: 'inline-block'
-          }} />
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-            {modelLoaded ? 'Online' : 'Offline'}
-          </span>
-          <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.6, marginLeft: 4 }}>
-            ollama
-          </span>
-        </div>
-      </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: '#fff' }}>NEXURA AI Assistant</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                        <span style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          background: modelLoaded ? '#34c759' : '#ff9500',
+                          boxShadow: modelLoaded ? '0 0 8px rgba(52, 199, 89, 0.6)' : 'none',
+                          display: 'inline-block'
+                        }} />
+                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>
+                          {modelLoaded ? 'Online' : 'Connecting...'}
+                        </span>
+                      </div>
+                    </div>
                     {scanning && (
-                      <span style={{
+                      <div style={{
                         marginLeft: 'auto',
                         fontSize: 12,
-                        color: 'var(--primary)',
-                        background: 'rgba(24,95,165,0.15)',
-                        padding: '4px 8px',
-                        borderRadius: 4,
+                        color: '#5856d6',
+                        background: 'rgba(88, 86, 214, 0.15)',
+                        padding: '6px 12px',
+                        borderRadius: 20,
                         fontWeight: 600,
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 6
+                        gap: 8,
+                        border: '1px solid rgba(88, 86, 214, 0.2)'
                       }}>
-                        <span style={{
-                          width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)',
-                          animation: 'pulse 1.5s infinite'
+                        <div className="ai-pulse" style={{
+                          width: 8, height: 8, borderRadius: '50%', background: '#5856d6',
+                          boxShadow: '0 0 10px #5856d6'
                         }} />
-                        AI Skanerlashda...
-                      </span>
+                        Scanning...
+                      </div>
                     )}
                   </div>
 
-          {/* Chat Messages Log */}
-          <div style={{
-            flex: 1,
-            padding: 16,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 14,
-            minHeight: 0,
-          }}>
-                  {chatLogs.map((log, idx) => (
-                    <div key={idx} style={{
-                      alignSelf: log.role === 'user' ? 'flex-end' : 'flex-start',
-                      maxWidth: '85%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}>
-                      <div style={{
-                        background: log.role === 'user' ? 'var(--primary)' : 'var(--bg-input)',
-                        color: log.role === 'user' ? '#fff' : 'var(--text)',
-                        padding: '12px 16px',
-                        borderRadius: log.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                        fontSize: 14,
-                        lineHeight: '1.5',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                  {/* Chat Messages Log */}
+                  <div style={{
+                    flex: 1,
+                    padding: '20px',
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 20,
+                    minHeight: 0,
+                    scrollbarWidth: 'none'
+                  }}>
+                    <style>{`
+                      .chat-scroll::-webkit-scrollbar { display: none; }
+                      .ai-pulse { animation: ai-pulse-anim 1.5s infinite; }
+                      @keyframes ai-pulse-anim { 0%, 100% { opacity: 0.5; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.1); } }
+                    `}</style>
+                    {chatLogs.map((log, idx) => (
+                      <div key={idx} style={{
+                        alignSelf: log.role === 'user' ? 'flex-end' : 'flex-start',
+                        maxWidth: '80%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: log.role === 'user' ? 'flex-end' : 'flex-start',
                       }}>
-                        {renderMarkdown(log.content)}
-                        
-                        {/* Render Scan Results Card inside AI response */}
-                        {log.scanData && (
-                          <div style={{
-                            marginTop: 12,
-                            background: 'rgba(15,23,42,0.6)',
-                            borderRadius: 6,
-                            border: '1px solid var(--border)',
-                            padding: 12,
-                            fontSize: 13,
-                          }}>
-                            <div style={{ fontWeight: 700, color: 'var(--primary)', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
-                              <span>📊 Skanerlash Tafsilotlari</span>
-                              <span style={{ color: 'var(--success)' }}>Yakunlandi</span>
-                            </div>
-                            <div style={{ marginBottom: 4 }}><strong>Target:</strong> {log.scanData.target}</div>
-                            
-                            {/* Technologies display */}
-                            {log.scanData.technologies && (
-                              <div style={{ marginBottom: 8, fontSize: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                {log.scanData.technologies.cms && (
-                                  <span style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--critical)', padding: '2px 6px', borderRadius: 4 }}>
-                                    CMS: {log.scanData.technologies.cms}
-                                  </span>
-                                )}
-                                {log.scanData.technologies.server && (
-                                  <span style={{ background: 'rgba(59,130,246,0.2)', color: 'var(--primary)', padding: '2px 6px', borderRadius: 4 }}>
-                                    Server: {log.scanData.technologies.server}
-                                  </span>
-                                )}
-                              </div>
-                            )}
+                        <div style={{
+                          background: log.role === 'user'
+                            ? 'linear-gradient(135deg, #007aff, #0055ff)'
+                            : 'rgba(255, 255, 255, 0.08)',
+                          color: '#fff',
+                          padding: '12px 18px',
+                          borderRadius: log.role === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
+                          fontSize: 14,
+                          lineHeight: '1.6',
+                          boxShadow: log.role === 'user'
+                            ? '0 4px 15px rgba(0, 122, 255, 0.3)'
+                            : '0 4px 15px rgba(0, 0, 0, 0.1)',
+                          border: log.role === 'ai' ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                        }}>
+                          {renderMarkdown(log.content)}
 
-                            {/* Tools run summary */}
-                            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 8 }}>
-                              <div style={{ fontWeight: 600, marginBottom: 4 }}>Ishlatilgan vositalar:</div>
-                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {log.scanData && (
+                            <div style={{
+                              marginTop: 15,
+                              background: 'rgba(0, 0, 0, 0.2)',
+                              borderRadius: 14,
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                              padding: 16,
+                              fontSize: 13,
+                            }}>
+                              <div style={{ fontWeight: 700, color: '#5856d6', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                                  Scan Natijalari
+                                </span>
+                                <span style={{ fontSize: 11, background: 'rgba(52, 199, 89, 0.2)', color: '#34c759', padding: '2px 8px', borderRadius: 10 }}>Muvaffaqiyatli</span>
+                              </div>
+                              <div style={{ marginBottom: 10, color: 'rgba(255,255,255,0.8)' }}>
+                                <strong style={{ color: '#fff' }}>Target:</strong> {log.scanData.target}
+                              </div>
+
+                              {log.scanData.technologies && (
+                                <div style={{ marginBottom: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                  {log.scanData.technologies.cms && (
+                                    <span style={{ background: 'rgba(175, 82, 222, 0.2)', color: '#af52de', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600 }}>
+                                      {log.scanData.technologies.cms}
+                                    </span>
+                                  )}
+                                  {log.scanData.technologies.server && (
+                                    <span style={{ background: 'rgba(0, 122, 255, 0.2)', color: '#007aff', padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600 }}>
+                                      {log.scanData.technologies.server}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 12 }}>
                                 {log.scanData.results?.map((r, i) => (
                                   <div key={i} style={{
-                                    background: 'var(--bg-card)',
-                                    padding: '4px 8px',
-                                    borderRadius: 4,
+                                    background: 'rgba(255,255,255,0.05)',
+                                    padding: '5px 10px',
+                                    borderRadius: 8,
                                     fontSize: 11,
-                                    border: '1px solid var(--border)',
+                                    color: 'rgba(255,255,255,0.6)',
+                                    border: '1px solid rgba(255,255,255,0.05)',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: 6
+                                    gap: 8
                                   }}>
-                                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: r.success ? 'var(--success)' : 'var(--danger)' }} />
+                                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: r.success ? '#34c759' : '#ff3b30' }} />
                                     {r.tool?.toUpperCase()}
                                   </div>
                                 ))}
                               </div>
+
+                              {log.scanData.report_html && (
+                                <div style={{ marginTop: 15 }}>
+                                  <a href={log.scanData.report_html} target="_blank" rel="noopener noreferrer"
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: 8,
+                                      background: 'rgba(255,255,255,0.1)',
+                                      color: '#fff',
+                                      textDecoration: 'none',
+                                      padding: '10px',
+                                      borderRadius: 10,
+                                      fontWeight: 600,
+                                      fontSize: 12,
+                                      transition: 'all 0.2s',
+                                      border: '1px solid rgba(255,255,255,0.1)'
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                                    onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                                  >
+                                    Hisobotni ko'rish
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                  </a>
+                                </div>
+                              )}
                             </div>
-
-                            {/* Download Link */}
-                            {log.scanData.report_html && (
-                              <div style={{ marginTop: 12, textAlign: 'center' }}>
-                                <a href={log.scanData.report_html} target="_blank" rel="noopener noreferrer"
-                                  style={{
-                                    display: 'block',
-                                    background: 'var(--primary)',
-                                    color: '#fff',
-                                    textDecoration: 'none',
-                                    padding: '8px 12px',
-                                    borderRadius: 6,
-                                    fontWeight: 700,
-                                    fontSize: 12,
-                                    transition: 'opacity 0.15s',
-                                  }}
-                                  onMouseOver={e => e.currentTarget.style.opacity = 0.9}
-                                  onMouseOut={e => e.currentTarget.style.opacity = 1}
-                                >
-                                  Batafsil HTML Hisobotni Ochish &rarr;
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                          )}
+                        </div>
+                        <span style={{
+                          fontSize: 10,
+                          color: 'rgba(255,255,255,0.3)',
+                          marginTop: 6,
+                          fontWeight: 500,
+                        }}>
+                          {log.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                       </div>
-                      <span style={{
-                        fontSize: 10,
-                        color: 'var(--text-muted)',
-                        alignSelf: log.role === 'user' ? 'flex-end' : 'flex-start',
-                        marginTop: 4,
-                        marginRight: log.role === 'user' ? 4 : 0,
-                        marginLeft: log.role === 'ai' ? 4 : 0,
-                      }}>
-                        {log.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  ))}
-                  
-                  {chatLoading && (
-                    <div style={{ alignSelf: 'flex-start', background: 'var(--bg-input)', padding: '12px 16px', borderRadius: '12px 12px 12px 2px', display: 'flex', gap: 4, alignItems: 'center' }}>
-                      <span className="dot" style={{ width: 8, height: 8, background: 'var(--text-muted)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both' }} />
-                      <span className="dot" style={{ width: 8, height: 8, background: 'var(--text-muted)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.2s' }} />
-                      <span className="dot" style={{ width: 8, height: 8, background: 'var(--text-muted)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.4s' }} />
-                      <style>{`
-                        @keyframes bounce {
-                          0%, 80%, 100% { transform: scale(0); }
-                          40% { transform: scale(1.0); }
-                        }
-                        @keyframes pulse {
-                          0%, 100% { opacity: 0.5; }
-                          50% { opacity: 1; }
-                        }
-                      `}</style>
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
+                    ))}
 
-                {/* Chat Input Area */}
-                <form onSubmit={handleChatSubmit} style={{
-                  padding: 12,
-                  borderTop: '1px solid var(--border)',
-                  background: 'var(--bg-card)',
-                  flexShrink: 0,
-                }}>
-                  <StyledWrapper>
-                    <div className="pb-ai-input-wrap">
-                      <input
-                        type="text"
-                        className="pb-ai-input"
-                        placeholder="Buyruq yozing..."
-                        value={chatInput}
-                        onChange={e => setChatInput(e.target.value)}
-                        disabled={chatLoading}
-                      />
-                      <button className="pb-ai-input-btn" type="submit" disabled={chatLoading || !chatInput.trim()}>
-                        <span>Yuborish</span>
-                        <img src="/ai.png" alt="" style={{ width: 18, height: 18, display: 'block' }} />
-                      </button>
-                    </div>
-                  </StyledWrapper>
-                </form>
-              </div>{/* End Chat Main Area */}
+                    {chatLoading && (
+                      <div style={{ alignSelf: 'flex-start', background: 'rgba(255, 255, 255, 0.08)', padding: '12px 20px', borderRadius: '20px 20px 20px 4px', display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <span className="dot" style={{ width: 6, height: 6, background: 'rgba(255,255,255,0.4)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both' }} />
+                        <span className="dot" style={{ width: 6, height: 6, background: 'rgba(255,255,255,0.4)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.2s' }} />
+                        <span className="dot" style={{ width: 6, height: 6, background: 'rgba(255,255,255,0.4)', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.4s' }} />
+                      </div>
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+
+                  {/* Chat Input Area */}
+                  <form onSubmit={handleChatSubmit} style={{
+                    padding: '16px 20px',
+                    background: 'rgba(15, 23, 42, 0.2)',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                    flexShrink: 0,
+                  }}>
+                    <StyledWrapper>
+                      <div className="pb-ai-input-wrap" style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        padding: '8px',
+                        boxShadow: 'none'
+                      }}>
+                        <input
+                          type="text"
+                          className="pb-ai-input"
+                          placeholder="Savol yoki buyruq..."
+                          value={chatInput}
+                          onChange={e => setChatInput(e.target.value)}
+                          disabled={chatLoading}
+                          style={{ fontSize: 14, color: '#fff' }}
+                        />
+                        <button className="pb-ai-input-btn" type="submit" disabled={chatLoading || !chatInput.trim()} style={{
+                          padding: '8px 16px',
+                          background: chatInput.trim() ? 'linear-gradient(135deg, #007aff, #0055ff)' : 'rgba(255,255,255,0.1)',
+                          boxShadow: chatInput.trim() ? '0 4px 12px rgba(0, 122, 255, 0.3)' : 'none',
+                          transition: 'all 0.3s'
+                        }}>
+                          <span style={{ fontWeight: 600 }}>Yuborish</span>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        </button>
+                      </div>
+                    </StyledWrapper>
+                  </form>
+                </div>{/* End Chat Main Area */}
               </PanelWrapper>
             </Panel>
           )}
@@ -1075,34 +1155,45 @@ export default function Scanner() {
               <TerminalBox>
                 <TerminalToolbar>
                   <Buttons>
-                    <Dot $color="#ee411a" onClick={handleMinimizeTerminal} />
-                    <Dot />
-                    <Dot />
+                    <Dot $color="#ff5f56" $icon="✕" onClick={handleMinimizeTerminal} />
+                    <Dot $color="#ffbd2e" $icon="−" />
+                    <Dot $color="#27c93f" $icon="⤢" />
                   </Buttons>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, overflow: 'hidden', margin: '0 8px' }}>
-                    <img src="/terminal.png" alt="terminal" style={{ width: 18, height: 18, objectFit: 'contain' }} />
-                    {terminals.map(t => (
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, overflow: 'hidden', margin: '0 20px' }}>
+                    {terminals.map((t, idx) => (
                       <div key={t.id} onClick={() => setActiveTerminal(t.id)}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: 4,
-                          padding: '3px 10px', cursor: 'pointer', borderRadius: '4px 4px 0 0',
-                          fontSize: 12, color: t.id === activeTerminal ? '#fff' : '#888',
-                          background: t.id === activeTerminal ? 'rgba(255,255,255,0.08)' : 'transparent',
-                          borderBottom: t.id === activeTerminal ? '1px solid #27c39f' : '1px solid transparent',
-                          transition: 'all 0.15s', whiteSpace: 'nowrap',
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '6px 14px', cursor: 'pointer', borderRadius: '8px 8px 0 0',
+                          fontSize: 12, fontWeight: 500,
+                          color: t.id === activeTerminal ? '#fff' : 'rgba(255,255,255,0.4)',
+                          background: t.id === activeTerminal ? 'rgba(255,255,255,0.1)' : 'transparent',
+                          borderBottom: t.id === activeTerminal ? '2px solid #38bdf8' : '2px solid transparent',
+                          transition: 'all 0.2s', whiteSpace: 'nowrap',
+                          position: 'relative'
                         }}>
-                        <span>#{terminals.indexOf(t) + 1}</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.7 }}><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                        <span>session-{idx + 1}</span>
                         {terminals.length > 1 && (
                           <span onClick={(e) => { e.stopPropagation(); closeTerminal(t.id) }}
-                            style={{ fontSize: 10, opacity: 0.5, cursor: 'pointer', marginLeft: 2 }}>
-                            ✕
+                            style={{ fontSize: 14, opacity: 0.5, cursor: 'pointer', padding: '0 2px' }}
+                            onMouseEnter={e => e.target.style.opacity = 1}
+                            onMouseLeave={e => e.target.style.opacity = 0.5}>
+                            ×
                           </span>
                         )}
                       </div>
                     ))}
+                    <AddTab onClick={addTerminal}>+</AddTab>
                   </div>
-                  <AddTab onClick={addTerminal}>+</AddTab>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 8px #38bdf8' }} />
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.3)', letterSpacing: 0.5 }}>ZSH</span>
+                  </div>
                 </TerminalToolbar>
+
                 <TerminalBody>
                   {terminals.map(t => {
                     const inputId = 'term-input-' + t.id
@@ -1110,20 +1201,31 @@ export default function Scanner() {
                     <div key={t.id} style={{ display: t.id === activeTerminal ? 'flex' : 'none', flex: 1, flexDirection: 'column', minHeight: 0 }}>
                       <OutputArea>
                         {t.logs.length === 0 && !t.loading && (
-                          <OutputLine $log="">Welcome to NEXURA Security Terminal #{terminals.indexOf(t) + 1}</OutputLine>
+                          <OutputLine $log="">
+                            <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>NEXURA Security Terminal v2.0.0</span><br/>
+                            <span style={{ opacity: 0.5 }}>Type 'help' to list available commands.</span><br/><br/>
+                          </OutputLine>
                         )}
                         {t.logs.map((log, idx) => (
                           <OutputLine key={idx} $log={log}>{log}</OutputLine>
                         ))}
                         {t.loading && (
-                          <OutputLine $log="">Buyruq bajarilmoqda, kuting...</OutputLine>
+                          <OutputLine $log="" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span className="ai-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: '#38bdf8' }} />
+                            <span style={{ opacity: 0.7 }}>Processing request...</span>
+                          </OutputLine>
                         )}
                         <div ref={terminalEndRef} />
-                        <div style={{ display: 'flex', alignItems: 'center', padding: '4px 0', whiteSpace: 'nowrap' }}>
-                          <span style={{marginLeft:4,color:'#1eff8e'}}>00Kubi@admin:</span>
-                          <span style={{marginLeft:4,color:'#4878c0'}}>~</span>
-                          <span style={{marginLeft:4,color:'#ddd'}}>$</span>
-                          <form onSubmit={(e) => handleTerminalSubmit(e, t.id)} style={{ display: 'flex', flex: 1, minWidth: 0 }}>
+
+                        <div style={{ display: 'flex', alignItems: 'flex-start', padding: '10px 0' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 10, flexShrink: 0 }}>
+                            <span style={{ color: '#27c93f', fontWeight: 'bold' }}>➜</span>
+                            <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>~</span>
+                            <span style={{ color: '#fff', opacity: 0.5 }}>git:(</span>
+                            <span style={{ color: '#f87171' }}>main</span>
+                            <span style={{ color: '#fff', opacity: 0.5 }}>)</span>
+                          </div>
+                          <form onSubmit={(e) => handleTerminalSubmit(e, t.id)} style={{ flex: 1 }}>
                             <TerminalInput2
                               id={inputId}
                               value={t.input}

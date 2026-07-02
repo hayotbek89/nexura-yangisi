@@ -67,8 +67,13 @@ export default function App() {
         <ErrorBoundary>
           <Sidebar page={page} onNavigate={(p) => { setPage(p); setMenuOpen(false) }} menuOpen={menuOpen} onToggle={() => setMenuOpen(!menuOpen)} onLogout={handleLogout} />
           <div style={{
-            flex: 1, padding: '24px', overflow: 'auto',
+            flex: 1, padding: isMobile ? '12px' : '20px',
+            overflow: 'hidden',
             marginLeft: isMobile ? 0 : undefined,
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100vh',
+            position: 'relative'
           }}>
             <div style={{ display: isMobile ? 'block' : 'none', marginBottom: 16 }}>
               <button onClick={() => setMenuOpen(!menuOpen)}
@@ -79,11 +84,18 @@ export default function App() {
                 {menuOpen ? '✕ Menyu' : '☰ Menyu'}
               </button>
             </div>
-            {page === 'scanner' && <Scanner />}
-            {page === 'history' && <History />}
-            {page === 'reports' && <Reports />}
-            {page === 'github' && <GitHub />}
-            {page === 'settings' && <Settings />}
+
+            <div style={{
+              flex: 1,
+              overflowY: page === 'scanner' ? 'hidden' : 'auto',
+              paddingBottom: page === 'scanner' ? 0 : 100
+            }}>
+              {page === 'scanner' && <Scanner />}
+              {page === 'history' && <History />}
+              {page === 'reports' && <Reports />}
+              {page === 'github' && <GitHub />}
+              {page === 'settings' && <Settings />}
+            </div>
           </div>
         </ErrorBoundary>
         <TerminalToggle />

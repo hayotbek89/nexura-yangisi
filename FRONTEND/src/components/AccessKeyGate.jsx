@@ -120,6 +120,69 @@ const StatusText = styled(motion.div)`
   min-height: 20px;
 `
 
+const StyledButtonWrapper = styled.div`
+  width: 100%;
+
+  button {
+    width: 100%;
+    position: relative;
+    height: 3.5em;
+    border: 3px ridge #149CEA;
+    outline: none;
+    background-color: transparent;
+    color: white;
+    transition: 1s;
+    border-radius: 0.3em;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: ${p => p.$disabled ? 0.6 : 1};
+    pointer-events: ${p => p.$disabled ? 'none' : 'auto'};
+  }
+
+  button::after {
+    content: "";
+    position: absolute;
+    top: -10px;
+    left: 3%;
+    width: 95%;
+    height: 40%;
+    background-color: var(--bg);
+    transition: 0.5s;
+    transform-origin: center;
+  }
+
+  button::before {
+    content: "";
+    transform-origin: center;
+    position: absolute;
+    top: 80%;
+    left: 3%;
+    width: 95%;
+    height: 40%;
+    background-color: var(--bg);
+    transition: 0.5s;
+  }
+
+  button:hover::before, button:hover::after {
+    transform: scale(0)
+  }
+
+  button:hover {
+    box-shadow: inset 0px 0px 25px #1479EA;
+  }
+
+  .txt {
+    position: relative;
+    z-index: 1;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+`;
+
 const ScanLine = styled(motion.div)`
   position: absolute;
   left: 0;
@@ -311,7 +374,7 @@ export default function AccessKeyGate({ onAccess }) {
               BLOKLANGAN — {Math.floor(blockedLeft / 60)}:{(blockedLeft % 60).toString().padStart(2, '0')}
             </StatusText>
           ) : (
-            <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 24 }}>
               <Input
                 type="password"
                 value={key}
@@ -325,27 +388,14 @@ export default function AccessKeyGate({ onAccess }) {
                 } : {}}
                 autoFocus
               />
-              <motion.button
-                type="submit"
-                disabled={state === 'validating' || !key.trim()}
-                style={{
-                  padding: '12px 24px',
-                  background: state === 'validating' ? 'var(--bg-input)' : 'var(--primary)',
-                  border: '1px solid var(--primary)',
-                  borderRadius: 'var(--radius)',
-                  color: '#fff',
-                  fontFamily: 'monospace',
-                  fontSize: 13,
-                  letterSpacing: 2,
-                  cursor: state === 'validating' ? 'not-allowed' : 'pointer',
-                  textTransform: 'uppercase',
-                  opacity: !key.trim() ? 0.5 : 1,
-                }}
-                whileHover={key.trim() && state !== 'validating' ? { scale: 1.02 } : {}}
-                whileTap={key.trim() && state !== 'validating' ? { scale: 0.98 } : {}}
-              >
-                {state === 'validating' ? 'Tekshirilmoqda...' : 'Kirish'}
-              </motion.button>
+
+              <StyledButtonWrapper $disabled={!key.trim() || state === 'validating'}>
+                <button type="submit" disabled={state === 'validating' || !key.trim()}>
+                  <span className="txt">
+                    {state === 'validating' ? 'TEKSHIRILMOQDA...' : 'KIRISH'}
+                  </span>
+                </button>
+              </StyledButtonWrapper>
             </form>
           )}
 
